@@ -1,3 +1,5 @@
+![Python build and test](https://github.com/aprilweilab/pyigd/actions/workflows/python-package.yml/badge.svg)
+
 # pyigd
 
 PyIGD is a Python-only parser the [Indexable Genotype Data (IGD) format](https://github.com/aprilweilab/picovcf/blob/main/IGD.FORMAT.md).
