@@ -29,8 +29,11 @@ def _read_uint32(file_obj: BinaryIO) -> int:
     return struct.unpack("I", file_obj.read(4))[0]
 
 
-def _read_string(file_obj: BinaryIO) -> str:
-    length = _read_uint64(file_obj)
+def _read_string(version: int, file_obj: BinaryIO) -> str:
+    if version == 3:
+        length = _read_uint64(file_obj)
+    else:
+        length = _read_uint32(file_obj)
     return file_obj.read(length).decode("utf-8")
 
 
@@ -65,7 +68,7 @@ class IGDFile(AbstractContextManager):
 
     HEADER_FORMAT = "QQIIQQQQQQQQQQQQQ"
     HEADER_MAGIC = 0x3a0c6fd7945a3481
-    SUPPORTED_FILE_VERSION = 3
+    SUPPORTED_FILE_VERSION = 4
 
     def __init__(self, filename: str):
         """
@@ -77,13 +80,14 @@ class IGDFile(AbstractContextManager):
 
         header_bytes = self.file_obj.read(self.NUM_HEADER_BYTES)
         (magic, self._version, self._ploidy, _, self._num_var, self._num_idv,
-         self._flags, self._fp_idx, self._fp_vars, self._fp_ind_ids, _, _, _, _, _,
+         self._flags, self._fp_idx, self._fp_vars, self._fp_ind_ids, self._fp_var_ids, _, _, _, _,
          _, _) = struct.unpack(self.HEADER_FORMAT, header_bytes)
         assert magic == self.HEADER_MAGIC, "Invalid magic number; not an IGD file"
-        assert self._version == self.SUPPORTED_FILE_VERSION, f"Unsupported IGD file format verison {self._version}"
+        assert self.SUPPORTED_FILE_VERSION == 4, "When incrementing file version, check backwards compat below"
+        assert self._version in (3, self.SUPPORTED_FILE_VERSION), f"Unsupported IGD file format verison {self._version}"
 
-        self._source = _read_string(self.file_obj)
-        self._description = _read_string(self.file_obj)
+        self._source = _read_string(self._version, self.file_obj)
+        self._description = _read_string(self._version, self.file_obj)
 
         self._before_first_var = self.file_obj.tell()
         self._all_refs = None
@@ -104,9 +108,9 @@ class IGDFile(AbstractContextManager):
         self._all_refs = []
         self._all_alts = []
         for i in range(self.num_variants):
-            ref = _read_string(self.file_obj)
+            ref = _read_string(self._version, self.file_obj)
             self._all_refs.append(ref)
-            alt = _read_string(self.file_obj)
+            alt = _read_string(self._version, self.file_obj)
             self._all_alts.append(alt)
 
     @property
@@ -268,5 +272,34 @@ class IGDFile(AbstractContextManager):
             assert self._all_refs is not None  # Make mypy happy
         return self._all_refs[variant_idx]
 
-    def get_individual_ids(self):
-        raise NotImplementedError("Retrieving individual IDs from IGD file not yet supported")
+    def get_individual_ids(self) -> List[str]:
+        """
+        Get a list of identifiers for the individuals in this dataset. The 0th individual's label
+        is at list position 0, and the last individual is at list position (num_individuals-1).
+
+        :return: Empty list if there are no identifiers (it is optional). Otherwise a list of strings.
+        """
+        result = []
+        if self._fp_ind_ids > 0:
+            self.file_obj.seek(self._fp_ind_ids)
+            count = _read_uint64(self.file_obj)
+            assert count == self._num_idv, f"Malformed file: {count} individual labels but expected {self._num_idv}"
+            for _ in range(count):
+                result.append(_read_string(self._version, self.file_obj))
+        return result
+
+    def get_variant_ids(self) -> List[str]:
+        """
+        Get a list of identifiers for the variants in this dataset. The 0th variants's label
+        is at list position 0, and the last variant is at list position (num_variants-1).
+
+        :return: Empty list if there are no identifiers (it is optional). Otherwise a list of strings.
+        """
+        result = []
+        if self._fp_var_ids > 0:
+            self.file_obj.seek(self._fp_var_ids)
+            count = _read_uint64(self.file_obj)
+            assert count == self._num_var, f"Malformed file: {count} variant labels but expected {self._num_var}"
+            for _ in range(count):
+                result.append(_read_string(self._version, self.file_obj))
+        return result
