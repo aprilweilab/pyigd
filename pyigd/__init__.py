@@ -230,14 +230,13 @@ class IGDFile(AbstractContextManager):
         is_sparse = (0 != (flags & BpPosFlags.SPARSE.value))
         position = bpp & ~BpPosFlags.MASK.value
         self.file_obj.seek(fp_data)
+        byte_count = _div_round_up(self.num_samples, 8)
         if is_sparse:
             as_list = _read_u32_list(self.file_obj)
-            max_index = as_list[-1] if as_list else 0
-            sample_bv = BitVector.BitVector(size=max_index+1)
+            sample_bv = BitVector.BitVector(size=byte_count*8)
             for sample_idx in as_list:
                 sample_bv[sample_idx] = 1
         else:
-            byte_count = _div_round_up(self.num_samples, 8)
             data = self.file_obj.read(byte_count)
             sample_bv = BitVector.BitVector(rawbytes=data)
         return (position, is_missing, sample_bv)
