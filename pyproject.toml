@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "pyigd"
+version = "0.1"
+authors = [
+  { name="Drew DeHaas" },
+]
+description = "Parser for IGD files"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/aprilweilab/pyigd"
+Issues = "https://github.com/aprilweilab/pyigd/issues"

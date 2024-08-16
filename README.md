@@ -8,7 +8,9 @@ For a C++ library that supports creating and parsing IGD, see [picovcf](https://
 
 ## Installation
 
-Clone the code and then either install for development:
+You can install the latest release of PyIGD from pypi, via `pip install pyigd`.
+
+For development, you can clone the code install it directly from the directory (this will automatically reflect any code changes you make):
 ```
 pip install -e pyigd/
 ```
