@@ -57,9 +57,9 @@ IGD can be highly performant for a few reasons:
 
 ## How do I use IGD in my project?
 
-* Clone [picovcf](https://github.com/aprilweilab/picovcf) and follow the instructions in its [README](https://github.com/aprilweilab/picovcf/blob/main/README.md) to build the example tools for that library.
+* Clone [picovcf](https://github.com/aprilweilab/picovcf) and follow the instructions in its [README](https://github.com/aprilweilab/picovcf/blob/main/README.md) to build the tools for that library.
   * If you want to be able to convert `.vcf.gz` (compressed VCF) to IGD, make sure you build with `-DENABLE_VCF_GZ=ON`
-* One of the built tools will be `vcfconf`, which converts from VCF to IGD. Run `vcfconv <vcf file> <igd file>` to convert your data to IGD.
+* One of the built tools will be `igdtools`, which can converts from VCF to IGD, among other things (such as filtering IGD files).
 * Do one of the following:
   * If your project is C++, copy [picovcf.hpp](https://github.com/aprilweilab/picovcf/blob/main/picovcf.hpp) into your project, `#include` it somewhere and then use according to the [documentation](https://picovcf.readthedocs.io/en/latest/)
   * If your project is Python, clone [pyigd](https://github.com/aprilweilab/pyigd/) and install it per the [README instructions](https://github.com/aprilweilab/pyigd/blob/main/README.md).
