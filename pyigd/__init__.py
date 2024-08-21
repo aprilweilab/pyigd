@@ -1,9 +1,9 @@
 """
-Module for reading Indexable Genotype Data (IGD) files.
+Module for reading and writing Indexable Genotype Data (IGD) files.
 """
 import struct
 from enum import Enum
-from typing import BinaryIO, List, Tuple, Union
+from typing import BinaryIO, List, Tuple, Union, Optional
 from dataclasses import dataclass
 # Optional import. BitVector is only needed when using the APIs that return them.
 try:
@@ -51,7 +51,7 @@ def _div_round_up(value: int, round_to: int) -> int:
     return (value + (round_to - 1)) // round_to
 
 
-def samples_for_bv(data: bytes, index: int, sample_list: List[int]):
+def _samples_for_bv(data: bytes, index: int, sample_list: List[int]):
     mask = 0x1 << 7
     value = data[index]
     sample_offset = index * 8
@@ -64,6 +64,7 @@ def samples_for_bv(data: bytes, index: int, sample_list: List[int]):
         bit += 1
 
 
+# Internal constants shared between IGDReader and IGDWriter.
 class IGDConstants:
     NUM_HEADER_BYTES = 128
     INDEX_ENTRY_BYTES = 16
@@ -76,12 +77,12 @@ class IGDConstants:
 
 
 class IGDReader:
-    def __init__(self, file_obj: BinaryIO):
-        """
-        Construct an IGDReader object for reading data from a file.
+    """
+    Construct an IGDReader object for reading data from a file.
 
-        :param filename: The path to the file to be opened.
-        """
+    :param file_obj: The file object to read from; should be opened in binary mode ("rb").
+    """
+    def __init__(self, file_obj: BinaryIO):
         self.file_obj = file_obj
 
         header_bytes = self.file_obj.read(IGDConstants.NUM_HEADER_BYTES)
@@ -111,6 +112,9 @@ class IGDReader:
 
     @property
     def is_phased(self):
+        """
+        True if the data is phased. IGD doesn't support mixed phasedness.
+        """
         return bool(self._flags & IGDConstants.FLAG_IS_PHASED)
 
     @property
@@ -211,7 +215,7 @@ class IGDReader:
             byte_count = _div_round_up(self.num_samples, 8)
             data = self.file_obj.read(byte_count)
             for i in range(byte_count):
-                samples_for_bv(data, i, sample_list)
+                _samples_for_bv(data, i, sample_list)
         return (position, is_missing, sample_list)
 
     def get_samples_bv(self, variant_idx: int):
@@ -304,6 +308,7 @@ class IGDReader:
         return result
 
 
+# Internal class for managing the fixed-sized header of an IGD file.
 @dataclass
 class IGDHeader:
     magic: int
@@ -337,6 +342,22 @@ def _write_str(file_obj, string):
 
 
 class IGDWriter:
+    """
+    Construct an IGDWriter for a given output stream.
+
+    :param out_stream: The output stream to write to; usually a file opened via mode "wb".
+    :param individuals: The number of individual samples in the file. NOT the number of haploids
+        unless ploidy=1.
+    :param ploidy: The ploidy of each individual sample.
+    :param phased: Whether the data being stored is phased.
+    :param source: A string describing where the data came from.
+    :param description: A string describing the contents of the file.
+    :param sparse_threshold: The threshold for choosing between sparse and dense sample lists when
+        writing variant data to the file. Default is 32, which means that we still store variants
+        sparsely if their frequency is less than or equal to 1/32. This is the threshold that is
+        theoretically the break-even point between sparse and dense representations (since the
+        sparse representation uses 32-bit integers, and dense uses a bit per sample).
+    """
     def __init__(self,
                  out_stream: BinaryIO,
                  individuals: int,
@@ -363,6 +384,10 @@ class IGDWriter:
         self.last_var_position = 0
 
     def write_header(self):
+        """
+        Write the file header to the current output buffer position. Fails if that
+        position if not the start of the buffer.
+        """
         assert self.out.tell() == 0, "Writing header to wrong location"
         self.out.write(self.header.pack())
         _write_str(self.out, self.source)
@@ -387,6 +412,20 @@ class IGDWriter:
                       alt_allele: str,
                       samples: List[int],
                       is_missing: bool = False):
+        """
+        Write the next variant, including sample information, to the file.
+        Variants must be written in ascending order of their base pair position.
+
+        :param position: Base-pair position.
+        :param ref_allele: The reference allele.
+        :param alt_allele: The alternate allele.
+        :param samples: The list of samples, as indexes. E.g. the list [4, 10] means that samples
+            numbered 4 and 10 have this variant's alternate allele. This list must be in ascending
+            order.
+        :param is_missing: Set to true if the sample list represents the list of samples that are
+            missing allele values at this position (in which case the reference and alt allele are
+            somewhat irrelevant).
+        """
         assert position >= self.last_var_position, "Out of order variant (must be written in ascending order)"
         self.last_var_position = position
         self.ref_alleles.append(ref_allele)
@@ -417,12 +456,18 @@ class IGDWriter:
         self.header.num_variants += 1
     
     def write_index(self):
+        """
+        Write the variant position index. Must be called _after_  all calls to write_variant().
+        """
         assert len(self.index) == self.header.num_variants
         self.header.fp_index = self.out.tell()
         for item in self.index:
             self.out.write(item)
 
     def write_variant_info(self):
+        """
+        Write the variant information table. Must be called _after_ all calls to write_variant().
+        """
         assert len(self.ref_alleles) == self.header.num_variants
         assert len(self.alt_alleles) == self.header.num_variants
         self.header.fp_variants = self.out.tell()
@@ -431,6 +476,11 @@ class IGDWriter:
             _write_str(self.out, self.alt_alleles[i])
 
     def write_individual_ids(self, labels: List[str]):
+        """
+        Write the identifiers for the individual samples (optional).
+
+        :param labels: Empty list or a list of strings, one for each individual.
+        """
         if len(labels) == 0:
             self.header.fp_individualids = 0
         else:
@@ -441,6 +491,11 @@ class IGDWriter:
                 _write_str(self.out, label)
 
     def write_variant_ids(self, labels: List[str]):
+        """
+        Write the identifiers for the variants (optional).
+
+        :param labels: Empty list or a list of strings, one for each variant.
+        """
         if len(labels) == 0:
             self.header.fp_variantids = 0
         else:
@@ -452,6 +507,16 @@ class IGDWriter:
 
 
 class IGDTransformer:
+    """
+    Class for transforming one IGD file to another.
+
+    :param in_stream: The input stream for the input IGD file. Usually a file opened via
+        mode "rb".
+    :param out_stream: The output stream for the output IGD file. Usually a file opened via
+        mode "wb".
+    :param use_bitvectors: If True, the modify_samples callback will be invoked with a
+        BitVector for the samples instead of a List[int].
+    """
     def __init__(self,
                  in_stream: BinaryIO,
                  out_stream: BinaryIO,
@@ -462,6 +527,13 @@ class IGDTransformer:
         self.use_bitvectors = use_bitvectors
 
     def transform(self):
+        """
+        Transform the input file to the output file, invoking modify_samples() for every variant
+        from the input file. If modify_samples() returns None then the variant will not be emitted
+        to the output file. Otherwise the variant will be emitted with whatever sample list is
+        returned from modify_samples().
+        """
+        variant_ids = self.reader.get_variant_ids()
         self.writer.write_header()
         for i in range(self.reader.num_variants):
             if self.use_bitvectors:
@@ -469,7 +541,9 @@ class IGDTransformer:
             else:
                 position, is_missing, samples = self.reader.get_samples(i)
             samples = self.modify_samples(position, is_missing, samples)
-            if samples is not None:
+            if samples is None:
+                variant_ids[i] = None
+            else:
                 # If the user is using bitvectors convert back to a sample list before writing.
                 if self.use_bitvectors:
                     samples_list = []
@@ -484,9 +558,9 @@ class IGDTransformer:
         self.writer.write_index()
         self.writer.write_variant_info()
         self.writer.write_individual_ids(self.reader.get_individual_ids())
-        self.writer.write_variant_ids(self.reader.get_variant_ids())
+        self.writer.write_variant_ids(list(filter(lambda v: v is not None, variant_ids)))
         self.writer.out.seek(0)
         self.writer.write_header()
 
-    def modify_samples(self, position: int, is_missing: bool, samples: Union[BVType, List[int]]) -> bool:
+    def modify_samples(self, position: int, is_missing: bool, samples: Union[BVType, List[int]]) -> Optional[Union[BVType, List[int]]]:
         raise NotImplementedError("Derived class must implement modify_samples()")
