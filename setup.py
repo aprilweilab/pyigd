@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 PACKAGE_NAME = "pyigd"
-VERSION = "0.1"
+VERSION = "0.2"
 
 setup(name=PACKAGE_NAME,
       packages=find_packages(),
