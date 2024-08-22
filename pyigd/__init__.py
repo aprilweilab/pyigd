@@ -99,7 +99,7 @@ class IGDReader:
         self._before_first_var = self.file_obj.tell()
         self._all_refs = None
         self._all_alts = None
-    
+
     def _read_allele_info(self):
         self.file_obj.seek(self._fp_vars)
         self._all_refs = []
@@ -325,16 +325,19 @@ class IGDHeader:
 
     def pack(self) -> bytes:
         return struct.pack(IGDConstants.HEADER_FORMAT,
-            self.magic, self.version, self.ploidy, self.sparse_threshold, self.num_variants,
-            self.num_individuals, self.flags, self.fp_index, self.fp_variants,
-            self.fp_individualids, self.fp_variantids, 0, 0, 0, 0, 0, 0)
+                           self.magic, self.version, self.ploidy, self.sparse_threshold,
+                           self.num_variants, self.num_individuals, self.flags, self.fp_index,
+                           self.fp_variants, self.fp_individualids, self.fp_variantids,
+                           0, 0, 0, 0, 0, 0)
 
 
 def _write_u64(file_obj, value):
     file_obj.write(struct.pack("Q", value))
 
+
 def _write_u32(file_obj, value):
     file_obj.write(struct.pack("I", value))
+
 
 def _write_str(file_obj, string):
     _write_u32(file_obj, len(string))
@@ -392,7 +395,7 @@ class IGDWriter:
         self.out.write(self.header.pack())
         _write_str(self.out, self.source)
         _write_str(self.out, self.description)
-    
+
     @staticmethod
     def _make_index_entry(position: int,
                           is_missing: bool,
@@ -454,7 +457,7 @@ class IGDWriter:
                 data[element] = data[element] | (1 << bit)
             self.out.write(struct.pack("B"*num_bytes, *data))
         self.header.num_variants += 1
-    
+
     def write_index(self):
         """
         Write the variant position index. Must be called _after_  all calls to write_variant().
@@ -552,8 +555,8 @@ class IGDTransformer:
                             samples_list.append(s)
                     samples = samples_list
                 self.writer.write_variant(position,
-                                          self.reader.get_ref_allele(i), 
-                                          self.reader.get_alt_allele(i), 
+                                          self.reader.get_ref_allele(i),
+                                          self.reader.get_alt_allele(i),
                                           samples)
         self.writer.write_index()
         self.writer.write_variant_info()
