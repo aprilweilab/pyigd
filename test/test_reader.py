@@ -1,4 +1,5 @@
-from pyigd import IGDFile, BpPosFlags
+from pyigd import IGDReader, IGDConstants, BpPosFlags
+from pyigd import IGDFile # TODO: remove
 import unittest
 import struct
 import tempfile
@@ -8,15 +9,15 @@ import random
 TEST_SOURCE = "SOURCE"
 TEST_DESCRIPTION = "DESCRIPTION"
 
-def make_header(magic=IGDFile.HEADER_MAGIC,
-                version=IGDFile.SUPPORTED_FILE_VERSION,
+def make_header(magic=IGDConstants.HEADER_MAGIC,
+                version=IGDConstants.SUPPORTED_FILE_VERSION,
                 ploidy=2,
                 variants=0,
                 individuals=0,
                 fp_idx=0,
                 fp_vars=0,
                 fp_indv=0):
-    return struct.pack(IGDFile.HEADER_FORMAT,
+    return struct.pack(IGDConstants.HEADER_FORMAT,
         magic, version, ploidy, 0, variants, individuals, 0, fp_idx, fp_vars, fp_indv,
         0, 0, 0, 0, 0, 0, 0)
 
@@ -105,16 +106,28 @@ class IGDTestFile(tempfile.TemporaryDirectory):
 
         return tmpdir
 
-class BasicTests(unittest.TestCase):
+class ReaderTests(unittest.TestCase):
     def test_good_header_no_data(self):
         with IGDTestFile(make_header()) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
-            igd_file = IGDFile(filename)
-            self.assertEqual(igd_file.description, TEST_DESCRIPTION)
-            self.assertEqual(igd_file.source, TEST_SOURCE)
-            self.assertEqual(igd_file.num_individuals, 0)
-            self.assertEqual(igd_file.num_variants, 0)
-            self.assertEqual(igd_file.ploidy, 2)
+            with open(filename, "rb") as f:
+                igd_file = IGDReader(f)
+                self.assertEqual(igd_file.description, TEST_DESCRIPTION)
+                self.assertEqual(igd_file.source, TEST_SOURCE)
+                self.assertEqual(igd_file.num_individuals, 0)
+                self.assertEqual(igd_file.num_variants, 0)
+                self.assertEqual(igd_file.ploidy, 2)
+
+    def test_good_header_no_data_old_style(self):
+        with IGDTestFile(make_header()) as tmpdir:
+            filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
+            with IGDFile(filename) as igd_file:
+                self.assertEqual(igd_file.description, TEST_DESCRIPTION)
+                self.assertEqual(igd_file.source, TEST_SOURCE)
+                self.assertEqual(igd_file.num_individuals, 0)
+                self.assertEqual(igd_file.num_variants, 0)
+                self.assertEqual(igd_file.ploidy, 2)
+
 
     def test_good_header_some_data(self):
         I = 10
@@ -132,82 +145,90 @@ class BasicTests(unittest.TestCase):
 
         with IGDTestFile(make_header(individuals=I, variants=V), variants) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
-            igd_file = IGDFile(filename)
-            self.assertEqual(igd_file.description, TEST_DESCRIPTION)
-            self.assertEqual(igd_file.source, TEST_SOURCE)
-            self.assertEqual(igd_file.num_individuals, I)
-            self.assertEqual(igd_file.num_variants, V)
-            self.assertEqual(igd_file.ploidy, 2)
+            with open(filename, "rb") as f:
+                igd_file = IGDReader(f)
+                self.assertEqual(igd_file.description, TEST_DESCRIPTION)
+                self.assertEqual(igd_file.source, TEST_SOURCE)
+                self.assertEqual(igd_file.num_individuals, I)
+                self.assertEqual(igd_file.num_variants, V)
+                self.assertEqual(igd_file.ploidy, 2)
 
-            for i in range(V):
-                pos, m, samples = igd_file.get_samples(i)
-                orig_pos, orig_m, orig_samples, _ = variants[i]
-                self.assertEqual(pos, orig_pos)
-                self.assertEqual(m, orig_m)
-                self.assertEqual(samples, orig_samples)
+                for i in range(V):
+                    pos, m, samples = igd_file.get_samples(i)
+                    orig_pos, orig_m, orig_samples, _ = variants[i]
+                    self.assertEqual(pos, orig_pos)
+                    self.assertEqual(m, orig_m)
+                    self.assertEqual(samples, orig_samples)
 
-            self.assertEqual(len(igd_file.get_individual_ids()), 0)
+                self.assertEqual(len(igd_file.get_individual_ids()), 0)
 
     def test_good_indiv_ids(self):
         I = 10
         with IGDTestFile(make_header(individuals=I), indiv_ids=list(map(str, range(I)))) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
-            igd_file = IGDFile(filename)
-            self.assertEqual(igd_file.num_individuals, I)
-            self.assertEqual(igd_file.get_individual_ids(), list(map(str, range(I))))
+            with open(filename, "rb") as f:
+                igd_file = IGDReader(f)
+                self.assertEqual(igd_file.num_individuals, I)
+                self.assertEqual(igd_file.get_individual_ids(), list(map(str, range(I))))
 
     def test_bad_indiv_ids(self):
         I = 10
         with IGDTestFile(make_header(individuals=I), indiv_ids=list(map(str, range(I+1)))) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
-            igd_file = IGDFile(filename)
-            with self.assertRaises(AssertionError):
-                igd_file.get_individual_ids()
+            with open(filename, "rb") as f:
+                igd_file = IGDReader(f)
+                with self.assertRaises(AssertionError):
+                    igd_file.get_individual_ids()
 
     def test_bad_var_ids(self):
         V = 25
         variants = [(i,False,[],(None if i > 5 else str(i))) for i in range(V)]
         with IGDTestFile(make_header(variants=V), variants=variants) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
-            igd_file = IGDFile(filename)
-            with self.assertRaises(AssertionError):
-                igd_file.get_variant_ids()
+            with open(filename, "rb") as f:
+                igd_file = IGDReader(f)
+                with self.assertRaises(AssertionError):
+                    igd_file.get_variant_ids()
 
     def test_good_var_ids(self):
         V = 21
         variants = [(i,False,[],str(i)) for i in range(V)]
         with IGDTestFile(make_header(variants=V), variants=variants) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
-            igd_file = IGDFile(filename)
-            self.assertEqual(igd_file.get_variant_ids(),
-                             [v[3] for v in variants])
+            with open(filename, "rb") as f:
+                igd_file = IGDReader(f)
+                self.assertEqual(igd_file.get_variant_ids(),
+                                [v[3] for v in variants])
 
 
 class CompatTests(unittest.TestCase):
     def test_bad_header_ver(self):
         with IGDTestFile(make_header(version=1)) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
-            with self.assertRaises(AssertionError):
-                _ = IGDFile(filename)
+            with open(filename, "rb") as f:
+                with self.assertRaises(AssertionError):
+                    _ = IGDReader(f)
 
     def test_bad_header_magic(self):
         with IGDTestFile(make_header(magic=0xbaadf00d)) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
-            with self.assertRaises(AssertionError):
-                _ = IGDFile(filename)
+            with open(filename, "rb") as f:
+                with self.assertRaises(AssertionError):
+                    _ = IGDReader(f)
 
     def test_v3_compatible(self):
         I = 10
         V = 50
         with IGDTestFile(make_header(version=3, individuals=I, variants=V), ver3=True) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
-            igd_file = IGDFile(filename)
+            with open(filename, "rb") as f:
+                igd_file = IGDReader(f)
 
-            self.assertEqual(igd_file.description, TEST_DESCRIPTION)
-            self.assertEqual(igd_file.source, TEST_SOURCE)
-            self.assertEqual(igd_file.num_individuals, I)
-            self.assertEqual(igd_file.num_variants, V)
-            self.assertEqual(igd_file.ploidy, 2)
+                self.assertEqual(igd_file.description, TEST_DESCRIPTION)
+                self.assertEqual(igd_file.source, TEST_SOURCE)
+                self.assertEqual(igd_file.num_individuals, I)
+                self.assertEqual(igd_file.num_variants, V)
+                self.assertEqual(igd_file.ploidy, 2)
 
 if __name__ == "__main__":
     unittest.main()

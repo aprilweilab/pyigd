@@ -5,7 +5,8 @@ if len(sys.argv) < 2:
     print("Pass in IGD filename")
     exit(1)
 
-with pyigd.IGDFile(sys.argv[1]) as igd_file:
+with open(sys.argv[1], "rb") as f:
+    igd_file = pyigd.IGDReader(f)
     print(f"Version: {igd_file.version}")
     print(f"Ploidy: {igd_file.ploidy}")
     print(f"Variants: {igd_file.num_variants}")
