@@ -1,10 +1,11 @@
 """
 Module for reading and writing Indexable Genotype Data (IGD) files.
 """
-import struct
+from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from enum import Enum
 from typing import BinaryIO, List, Tuple, Union, Optional
-from dataclasses import dataclass
+import struct
 # Optional import. BitVector is only needed when using the APIs that return them.
 try:
     import BitVector  # type: ignore
@@ -306,6 +307,27 @@ class IGDReader:
             for _ in range(count):
                 result.append(_read_string(self._version, self.file_obj))
         return result
+
+
+class IGDFile(IGDReader, AbstractContextManager):
+    """
+    DEPRECATED DO NOT USE. Context object for loading an IGD file. See IGDReader instead.
+
+    :param filename: The filename to open.
+    """
+    def __init__(self, filename: str):
+        file_obj = open(filename, "rb")
+        super().__init__(file_obj)
+
+    def __del__(self):
+        if self.file_obj is not None:
+            self.file_obj.close()
+        self.file_obj = None
+
+    def __exit__(self, *args):
+        if self.file_obj is not None:
+            self.file_obj.close()
+        self.file_obj = None
 
 
 # Internal class for managing the fixed-sized header of an IGD file.

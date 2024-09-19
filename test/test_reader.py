@@ -1,4 +1,5 @@
 from pyigd import IGDReader, IGDConstants, BpPosFlags
+from pyigd import IGDFile # TODO: remove
 import unittest
 import struct
 import tempfile
@@ -116,6 +117,17 @@ class ReaderTests(unittest.TestCase):
                 self.assertEqual(igd_file.num_individuals, 0)
                 self.assertEqual(igd_file.num_variants, 0)
                 self.assertEqual(igd_file.ploidy, 2)
+
+    def test_good_header_no_data_old_style(self):
+        with IGDTestFile(make_header()) as tmpdir:
+            filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
+            with IGDFile(filename) as igd_file:
+                self.assertEqual(igd_file.description, TEST_DESCRIPTION)
+                self.assertEqual(igd_file.source, TEST_SOURCE)
+                self.assertEqual(igd_file.num_individuals, 0)
+                self.assertEqual(igd_file.num_variants, 0)
+                self.assertEqual(igd_file.ploidy, 2)
+
 
     def test_good_header_some_data(self):
         I = 10
