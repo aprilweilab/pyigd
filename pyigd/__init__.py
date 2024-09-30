@@ -70,7 +70,7 @@ class IGDConstants:
     NUM_HEADER_BYTES = 128
     INDEX_ENTRY_BYTES = 16
 
-    HEADER_FORMAT = "QQIIQQQQQQQQQQQQQ"
+    HEADER_FORMAT = "QQIIQIIQQQQQQQQQQQ"
     HEADER_MAGIC = 0x3a0c6fd7945a3481
     SUPPORTED_FILE_VERSION = 4
 
@@ -87,7 +87,7 @@ class IGDReader:
         self.file_obj = file_obj
 
         header_bytes = self.file_obj.read(IGDConstants.NUM_HEADER_BYTES)
-        (magic, self._version, self._ploidy, _, self._num_var, self._num_idv,
+        (magic, self._version, self._ploidy, _, self._num_var, self._num_idv, _,
          self._flags, self._fp_idx, self._fp_vars, self._fp_ind_ids, self._fp_var_ids, _, _, _, _,
          _, _) = struct.unpack(IGDConstants.HEADER_FORMAT, header_bytes)
         assert magic == IGDConstants.HEADER_MAGIC, "Invalid magic number; not an IGD file"
@@ -339,6 +339,7 @@ class IGDHeader:
     sparse_threshold: int
     num_variants: int
     num_individuals: int
+    reserved: int
     flags: int
     fp_index: int
     fp_variants: int
@@ -348,7 +349,7 @@ class IGDHeader:
     def pack(self) -> bytes:
         return struct.pack(IGDConstants.HEADER_FORMAT,
                            self.magic, self.version, self.ploidy, self.sparse_threshold,
-                           self.num_variants, self.num_individuals, self.flags, self.fp_index,
+                           self.num_variants, self.num_individuals, 0, self.flags, self.fp_index,
                            self.fp_variants, self.fp_individualids, self.fp_variantids,
                            0, 0, 0, 0, 0, 0)
 
@@ -395,7 +396,7 @@ class IGDWriter:
         self.header = IGDHeader(
             magic=IGDConstants.HEADER_MAGIC, version=IGDConstants.SUPPORTED_FILE_VERSION,
             ploidy=ploidy, sparse_threshold=sparse_threshold, num_variants=0,
-            num_individuals=individuals,
+            num_individuals=individuals, reserved=0,
             flags=0 if not phased else IGDConstants.FLAG_IS_PHASED,
             fp_index=0, fp_variants=0, fp_individualids=0, fp_variantids=0)
         self.source = source
