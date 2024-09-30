@@ -18,7 +18,7 @@ def make_header(magic=IGDConstants.HEADER_MAGIC,
                 fp_vars=0,
                 fp_indv=0):
     return struct.pack(IGDConstants.HEADER_FORMAT,
-        magic, version, ploidy, 0, variants, individuals, 0, fp_idx, fp_vars, fp_indv,
+        magic, version, ploidy, 0, variants, individuals, 0, 0, fp_idx, fp_vars, fp_indv,
         0, 0, 0, 0, 0, 0, 0)
 
 def _write_u64(file_obj, value):
