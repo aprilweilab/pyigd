@@ -80,7 +80,7 @@ class IGDConstants:
     NUM_HEADER_BYTES = 128
     INDEX_ENTRY_BYTES = 16
 
-    HEADER_FORMAT = "QQIIQQQQQQQQQQQQQ"
+    HEADER_FORMAT = "QQIIQIIQQQQQQQQQQQ"
     HEADER_MAGIC = 0x3A0C6FD7945A3481
     SUPPORTED_FILE_VERSION = 4
 
@@ -105,6 +105,7 @@ class IGDReader:
             _,
             self._num_var,
             self._num_idv,
+            _,
             self._flags,
             self._fp_idx,
             self._fp_vars,
@@ -413,6 +414,7 @@ class IGDHeader:
     sparse_threshold: int
     num_variants: int
     num_individuals: int
+    reserved: int
     flags: int
     fp_index: int
     fp_variants: int
@@ -428,6 +430,7 @@ class IGDHeader:
             self.sparse_threshold,
             self.num_variants,
             self.num_individuals,
+            0,
             self.flags,
             self.fp_index,
             self.fp_variants,
@@ -491,6 +494,7 @@ class IGDWriter:
             sparse_threshold=sparse_threshold,
             num_variants=0,
             num_individuals=individuals,
+            reserved=0,
             flags=0 if not phased else IGDConstants.FLAG_IS_PHASED,
             fp_index=0,
             fp_variants=0,
