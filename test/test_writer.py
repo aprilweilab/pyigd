@@ -10,10 +10,10 @@ class CanonicalTestIGD:
     def __init__(self):
         self.variants = [
             (1, "A", "G", list(range(500, 1500))),
-            (1, "C", "G", list(range(0, 2000))),
-            (1, "T", "REALLYLONG", [1,2]),
-            (1, "A", "T", []),
-            (1, "G", "G", [0, 9, 19, 30, 42, 55]),
+            (2, "C", "G", list(range(0, 2000))),
+            (3, "T", "REALLYLONG", [1,2]),
+            (4, "A", "T", []),
+            (5, "G", "G", [0, 9, 19, 30, 42, 55]),
         ]
     
     def write(self, filename: str):
@@ -193,7 +193,47 @@ class TransformerTests(unittest.TestCase):
             with self.assertRaises(AssertionError) as context:
                 test_data.readAndVerify(in_file, self)
 
+    def test_drop_variant(self):
+        """
+        Copy an IGD dropping the first variant, using IGDTransformer
+        """
+        class MyXformer(IGDTransformer):
+            def modify_samples(self, position, is_missing, samples):
+                if position == 1:
+                    return None
+                return samples
 
+        test_data = CanonicalTestIGD()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            in_file = os.path.join(tmpdir, "created.igd")
+            out_file = os.path.join(tmpdir, "copied.igd")
+
+            test_data.write(in_file)
+            with open(in_file, "rb") as fin, open(out_file, "wb") as fout:
+                xformer = MyXformer(fin, fout)
+                xformer.transform()
+            # The xformed file should _not_ match out test data now
+            with self.assertRaises(AssertionError) as context:
+                test_data.readAndVerify(out_file, self)
+            # Just skip variant 1
+            with open(out_file, "rb") as f:
+                reader = IGDReader(f)
+                self.assertEqual(reader.num_individuals, 2000)
+                self.assertEqual(reader.num_variants, len(test_data.variants) - 1)
+                skipped = 0
+                for i, (pos, ref, alt, samples) in enumerate(test_data.variants):
+                    if pos == 1:
+                        skipped += 1
+                        continue
+                    idx = i - skipped
+                    self.assertEqual(reader.get_alt_allele(idx), alt)
+                    self.assertEqual(reader.get_ref_allele(idx), ref)
+                    rpos, is_missing, rsamples = reader.get_samples(idx)
+                    self.assertEqual(rpos, pos)
+                    self.assertFalse(is_missing)
+                    self.assertEqual(rsamples, samples)
+                self.assertEqual(reader.description, "TESTD")
+                self.assertEqual(reader.source, "TEST")
 
 if __name__ == "__main__":
     unittest.main()
