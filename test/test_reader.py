@@ -1,5 +1,5 @@
 from pyigd import IGDReader, IGDConstants, BpPosFlags
-from pyigd import IGDFile # TODO: remove
+from pyigd import IGDFile  # TODO: remove
 import unittest
 import struct
 import tempfile
@@ -9,23 +9,46 @@ import random
 TEST_SOURCE = "SOURCE"
 TEST_DESCRIPTION = "DESCRIPTION"
 
-def make_header(magic=IGDConstants.HEADER_MAGIC,
-                version=IGDConstants.SUPPORTED_FILE_VERSION,
-                ploidy=2,
-                variants=0,
-                individuals=0,
-                fp_idx=0,
-                fp_vars=0,
-                fp_indv=0):
-    return struct.pack(IGDConstants.HEADER_FORMAT,
-        magic, version, ploidy, 0, variants, individuals, 0, fp_idx, fp_vars, fp_indv,
-        0, 0, 0, 0, 0, 0, 0)
+
+def make_header(
+    magic=IGDConstants.HEADER_MAGIC,
+    version=IGDConstants.SUPPORTED_FILE_VERSION,
+    ploidy=2,
+    variants=0,
+    individuals=0,
+    fp_idx=0,
+    fp_vars=0,
+    fp_indv=0,
+):
+    return struct.pack(
+        IGDConstants.HEADER_FORMAT,
+        magic,
+        version,
+        ploidy,
+        0,
+        variants,
+        individuals,
+        0,
+        fp_idx,
+        fp_vars,
+        fp_indv,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+    )
+
 
 def _write_u64(file_obj, value):
     file_obj.write(struct.pack("Q", value))
 
+
 def _write_u32(file_obj, value):
     file_obj.write(struct.pack("I", value))
+
 
 def _write_str(ver3, file_obj, string):
     if ver3:
@@ -33,6 +56,7 @@ def _write_str(ver3, file_obj, string):
     else:
         _write_u32(file_obj, len(string))
     file_obj.write(string.encode("utf-8"))
+
 
 class IGDTestFile(tempfile.TemporaryDirectory):
     FILENAME = "test.igd"
@@ -84,7 +108,7 @@ class IGDTestFile(tempfile.TemporaryDirectory):
                 fp_indivs = 0
 
             # If provided write the variant ids
-            var_ids = [ident for _,_,_,ident in self.variants if ident is not None]
+            var_ids = [ident for _, _, _, ident in self.variants if ident is not None]
             if var_ids:
                 fp_varids = f.tell()
                 _write_u64(f, len(var_ids))
@@ -97,7 +121,7 @@ class IGDTestFile(tempfile.TemporaryDirectory):
 
             # Gross. If this wasn't test code I wouldn't do this...
             # We're just updating the last few fields of the header to set the file locations.
-            f.seek(0 + (6*8))
+            f.seek(0 + (6 * 8))
             _write_u64(f, fp_idx)
             _write_u64(f, fp_vars)
             _write_u64(f, fp_indivs)
@@ -105,6 +129,7 @@ class IGDTestFile(tempfile.TemporaryDirectory):
             f.flush()
 
         return tmpdir
+
 
 class ReaderTests(unittest.TestCase):
     def test_good_header_no_data(self):
@@ -128,20 +153,26 @@ class ReaderTests(unittest.TestCase):
                 self.assertEqual(igd_file.num_variants, 0)
                 self.assertEqual(igd_file.ploidy, 2)
 
-
     def test_good_header_some_data(self):
         I = 10
         V = 50
 
         def rand_samples():
-            num_samples = I*2
-            count = random.randint(0, num_samples-1)
+            num_samples = I * 2
+            count = random.randint(0, num_samples - 1)
             result = list(range(num_samples))
             random.shuffle(result)
             return sorted(result[:count])
 
-        variants = list(sorted([(random.randint(0, 100_000), False, rand_samples(), None)
-                                for i in range(V)], key=lambda v: v[0]))
+        variants = list(
+            sorted(
+                [
+                    (random.randint(0, 100_000), False, rand_samples(), None)
+                    for i in range(V)
+                ],
+                key=lambda v: v[0],
+            )
+        )
 
         with IGDTestFile(make_header(individuals=I, variants=V), variants) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
@@ -164,16 +195,22 @@ class ReaderTests(unittest.TestCase):
 
     def test_good_indiv_ids(self):
         I = 10
-        with IGDTestFile(make_header(individuals=I), indiv_ids=list(map(str, range(I)))) as tmpdir:
+        with IGDTestFile(
+            make_header(individuals=I), indiv_ids=list(map(str, range(I)))
+        ) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
             with open(filename, "rb") as f:
                 igd_file = IGDReader(f)
                 self.assertEqual(igd_file.num_individuals, I)
-                self.assertEqual(igd_file.get_individual_ids(), list(map(str, range(I))))
+                self.assertEqual(
+                    igd_file.get_individual_ids(), list(map(str, range(I)))
+                )
 
     def test_bad_indiv_ids(self):
         I = 10
-        with IGDTestFile(make_header(individuals=I), indiv_ids=list(map(str, range(I+1)))) as tmpdir:
+        with IGDTestFile(
+            make_header(individuals=I), indiv_ids=list(map(str, range(I + 1)))
+        ) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
             with open(filename, "rb") as f:
                 igd_file = IGDReader(f)
@@ -182,7 +219,7 @@ class ReaderTests(unittest.TestCase):
 
     def test_bad_var_ids(self):
         V = 25
-        variants = [(i,False,[],(None if i > 5 else str(i))) for i in range(V)]
+        variants = [(i, False, [], (None if i > 5 else str(i))) for i in range(V)]
         with IGDTestFile(make_header(variants=V), variants=variants) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
             with open(filename, "rb") as f:
@@ -192,13 +229,12 @@ class ReaderTests(unittest.TestCase):
 
     def test_good_var_ids(self):
         V = 21
-        variants = [(i,False,[],str(i)) for i in range(V)]
+        variants = [(i, False, [], str(i)) for i in range(V)]
         with IGDTestFile(make_header(variants=V), variants=variants) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
             with open(filename, "rb") as f:
                 igd_file = IGDReader(f)
-                self.assertEqual(igd_file.get_variant_ids(),
-                                [v[3] for v in variants])
+                self.assertEqual(igd_file.get_variant_ids(), [v[3] for v in variants])
 
 
 class CompatTests(unittest.TestCase):
@@ -210,7 +246,7 @@ class CompatTests(unittest.TestCase):
                     _ = IGDReader(f)
 
     def test_bad_header_magic(self):
-        with IGDTestFile(make_header(magic=0xbaadf00d)) as tmpdir:
+        with IGDTestFile(make_header(magic=0xBAADF00D)) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
             with open(filename, "rb") as f:
                 with self.assertRaises(AssertionError):
@@ -219,7 +255,9 @@ class CompatTests(unittest.TestCase):
     def test_v3_compatible(self):
         I = 10
         V = 50
-        with IGDTestFile(make_header(version=3, individuals=I, variants=V), ver3=True) as tmpdir:
+        with IGDTestFile(
+            make_header(version=3, individuals=I, variants=V), ver3=True
+        ) as tmpdir:
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
             with open(filename, "rb") as f:
                 igd_file = IGDReader(f)
@@ -229,6 +267,7 @@ class CompatTests(unittest.TestCase):
                 self.assertEqual(igd_file.num_individuals, I)
                 self.assertEqual(igd_file.num_variants, V)
                 self.assertEqual(igd_file.ploidy, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

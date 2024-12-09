@@ -10,6 +10,8 @@ pyigd Documentation
    :maxdepth: 2
    :caption: Contents:
 
+   pyigd
+
 pyigd is a Python library for reading and writing Indexable Genotype Data
 (IGD) files. `IGD is a binary format <https://github.com/aprilweilab/picovcf/blob/main/IGD.FORMAT.md>`_ that is very simple and uses no
 compression, but tends to be quite small and fast.

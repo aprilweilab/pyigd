@@ -1,8 +1,5 @@
-pyigd package
-=============
-
-Module contents
----------------
+pyigd API
+=========
 
 .. automodule:: pyigd
    :members:

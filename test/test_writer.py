@@ -6,19 +6,22 @@ import os
 TEST_SOURCE = "SOURCE"
 TEST_DESCRIPTION = "DESCRIPTION"
 
+
 class CanonicalTestIGD:
     def __init__(self):
         self.variants = [
             (1, "A", "G", list(range(500, 1500))),
             (2, "C", "G", list(range(0, 2000))),
-            (3, "T", "REALLYLONG", [1,2]),
+            (3, "T", "REALLYLONG", [1, 2]),
             (4, "A", "T", []),
             (5, "G", "G", [0, 9, 19, 30, 42, 55]),
         ]
-    
+
     def write(self, filename: str):
         with open(filename, "wb") as f:
-            w = IGDWriter(f, 2000, ploidy=1, phased=False, source="TEST", description="TESTD")
+            w = IGDWriter(
+                f, 2000, ploidy=1, phased=False, source="TEST", description="TESTD"
+            )
             w.write_header()
             for pos, ref, alt, samples in self.variants:
                 w.write_variant(pos, ref, alt, samples)
@@ -28,7 +31,7 @@ class CanonicalTestIGD:
             w.write_variant_ids([f"VAR{i}" for i in range(len(self.variants))])
             f.seek(0)
             w.write_header()
-            
+
     def readAndVerify(self, filename: str, test_case: unittest.TestCase):
         with open(filename, "rb") as f:
             reader = IGDReader(f)
@@ -63,7 +66,7 @@ class WriterTests(unittest.TestCase):
                 w.write_variant_ids([])
                 f.seek(0)
                 w.write_header()
-            
+
             with open(fn, "rb") as f:
                 reader = IGDReader(f)
                 self.assertEqual(reader.num_individuals, 100)
@@ -107,11 +110,13 @@ class WriterTests(unittest.TestCase):
                 with self.assertRaises(AssertionError) as context:
                     w.write_variant(100, "A", "G", [99, 98])
 
+
 class TransformerTests(unittest.TestCase):
     def test_copy(self):
         """
         Copy an IGD exactly using IGDTransformer.
         """
+
         class MyXformer(IGDTransformer):
             def modify_samples(self, position, is_missing, samples):
                 return samples
@@ -137,6 +142,7 @@ class TransformerTests(unittest.TestCase):
         """
         Copy an IGD dropping the first sample of every list, using IGDTransformer.
         """
+
         class MyXformer(IGDTransformer):
             def modify_samples(self, position, is_missing, samples):
                 return samples[1:]
@@ -165,6 +171,7 @@ class TransformerTests(unittest.TestCase):
         """
         Copy an IGD dropping the first sample of every list, using IGDTransformer.
         """
+
         class MyXformer(IGDTransformer):
             def modify_samples(self, position, is_missing, samples):
                 for i in range(len(samples)):
@@ -197,6 +204,7 @@ class TransformerTests(unittest.TestCase):
         """
         Copy an IGD dropping the first variant, using IGDTransformer
         """
+
         class MyXformer(IGDTransformer):
             def modify_samples(self, position, is_missing, samples):
                 if position == 1:
@@ -234,6 +242,7 @@ class TransformerTests(unittest.TestCase):
                     self.assertEqual(rsamples, samples)
                 self.assertEqual(reader.description, "TESTD")
                 self.assertEqual(reader.source, "TEST")
+
 
 if __name__ == "__main__":
     unittest.main()
