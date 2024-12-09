@@ -185,7 +185,9 @@ class IGDReader:
     @property
     def num_samples(self):
         """
-        Number of haploid samples (same as num_individuals * ploidy).
+        Number of samples. For phased data, this is num_individuals * ploidy. For unphased
+        data this is just num_individuals. Every returned sample index (from get_samples())
+        will be less than num_samples.
         """
         return self._num_idv * self._ploidy if self.is_phased else self._num_idv
 
@@ -252,7 +254,7 @@ class IGDReader:
 
     def get_samples(self, variant_idx: int) -> Tuple[int, bool, List[int]]:
         """
-        Given a variant index between 0...(num_variants-1), return the tuple (position, missing, samples, copies)
+        Given a variant index between 0...(num_variants-1), return the tuple (position, missing, samples)
         where position is the base-pair position, missing is True when this represents a row of missing
         data, samples is a list of sample indexes that have the alt allele for the given variant, and
         copies is the number of copies of the alternate allele (for unphased data only).
@@ -261,7 +263,7 @@ class IGDReader:
 
         :param variant_idx: Variant index between 0...(num_variants-1). Variants are ordered from
             smallest to largest base-pair position.
-        :return: The tuple (position, is_missing, samples, copies).
+        :return: The tuple (position, is_missing, samples).
         """
         self.file_obj.seek(self._get_var_idx_offset(variant_idx))
         bpp, fp_data = struct.unpack(
@@ -292,7 +294,7 @@ class IGDReader:
 
         :param variant_idx: Variant index between 0...(num_variants-1). Variants are ordered from
             smallest to largest base-pair position.
-        :return: The tuple (position, is_missing, samples, copies).
+        :return: The tuple (position, is_missing, samples).
         """
         assert (
             BitVector is not None
