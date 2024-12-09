@@ -1,24 +1,27 @@
 """
 Module for reading and writing Indexable Genotype Data (IGD) files.
 """
+
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum
 from typing import BinaryIO, List, Tuple, Union, Optional
+
 import struct
+
 # Optional import. BitVector is only needed when using the APIs that return them.
 try:
     import BitVector  # type: ignore
-    BVType = BitVector.BitVector
+
 except ImportError:
     BitVector = None
-    BVType = List[int]
 
 
 class BpPosFlags(Enum):
     """
     An enumeration of bitwise flags that describe the contents of each variants genotype data.
     """
+
     MASK = 0xFF00000000000000
     SPARSE = 0x0100000000000000
     IS_MISSING = 0x0200000000000000
@@ -58,7 +61,7 @@ def _samples_for_bv(data: bytes, index: int, sample_list: List[int]):
     sample_offset = index * 8
     bit = 0
     while value != 0:
-        is_set = (0 != (value & mask))
+        is_set = 0 != (value & mask)
         if is_set:
             sample_list.append(sample_offset + bit)
         value = (value << 1) & 0xFF
@@ -71,7 +74,7 @@ class IGDConstants:
     INDEX_ENTRY_BYTES = 16
 
     HEADER_FORMAT = "QQIIQQQQQQQQQQQQQ"
-    HEADER_MAGIC = 0x3a0c6fd7945a3481
+    HEADER_MAGIC = 0x3A0C6FD7945A3481
     SUPPORTED_FILE_VERSION = 4
 
     FLAG_IS_PHASED = 0x1
@@ -83,16 +86,40 @@ class IGDReader:
 
     :param file_obj: The file object to read from; should be opened in binary mode ("rb").
     """
+
     def __init__(self, file_obj: BinaryIO):
         self.file_obj = file_obj
 
         header_bytes = self.file_obj.read(IGDConstants.NUM_HEADER_BYTES)
-        (magic, self._version, self._ploidy, _, self._num_var, self._num_idv,
-         self._flags, self._fp_idx, self._fp_vars, self._fp_ind_ids, self._fp_var_ids, _, _, _, _,
-         _, _) = struct.unpack(IGDConstants.HEADER_FORMAT, header_bytes)
-        assert magic == IGDConstants.HEADER_MAGIC, "Invalid magic number; not an IGD file"
-        assert IGDConstants.SUPPORTED_FILE_VERSION == 4, "When incrementing file version, check backwards compat below"
-        assert self._version in (3, IGDConstants.SUPPORTED_FILE_VERSION), f"Unsupported IGD file format verison {self._version}"
+        (
+            magic,
+            self._version,
+            self._ploidy,
+            _,
+            self._num_var,
+            self._num_idv,
+            self._flags,
+            self._fp_idx,
+            self._fp_vars,
+            self._fp_ind_ids,
+            self._fp_var_ids,
+            _,
+            _,
+            _,
+            _,
+            _,
+            _,
+        ) = struct.unpack(IGDConstants.HEADER_FORMAT, header_bytes)
+        assert (
+            magic == IGDConstants.HEADER_MAGIC
+        ), "Invalid magic number; not an IGD file"
+        assert (
+            IGDConstants.SUPPORTED_FILE_VERSION == 4
+        ), "When incrementing file version, check backwards compat below"
+        assert self._version in (
+            3,
+            IGDConstants.SUPPORTED_FILE_VERSION,
+        ), f"Unsupported IGD file format verison {self._version}"
 
         self._source = _read_string(self._version, self.file_obj)
         self._description = _read_string(self._version, self.file_obj)
@@ -186,7 +213,7 @@ class IGDReader:
         """
         self.file_obj.seek(self._get_var_idx_offset(variant_idx))
         bpp, _ = struct.unpack("QQ", self.file_obj.read(IGDConstants.INDEX_ENTRY_BYTES))
-        flags = (bpp & BpPosFlags.MASK.value)
+        flags = bpp & BpPosFlags.MASK.value
         position = bpp & ~BpPosFlags.MASK.value
         return (position, flags)
 
@@ -203,10 +230,12 @@ class IGDReader:
         :return: The tuple (position, is_missing, samples).
         """
         self.file_obj.seek(self._get_var_idx_offset(variant_idx))
-        bpp, fp_data = struct.unpack("QQ", self.file_obj.read(IGDConstants.INDEX_ENTRY_BYTES))
-        flags = (bpp & BpPosFlags.MASK.value)
-        is_missing = (0 != (flags & BpPosFlags.IS_MISSING.value))
-        is_sparse = (0 != (flags & BpPosFlags.SPARSE.value))
+        bpp, fp_data = struct.unpack(
+            "QQ", self.file_obj.read(IGDConstants.INDEX_ENTRY_BYTES)
+        )
+        flags = bpp & BpPosFlags.MASK.value
+        is_missing = 0 != (flags & BpPosFlags.IS_MISSING.value)
+        is_sparse = 0 != (flags & BpPosFlags.SPARSE.value)
         position = bpp & ~BpPosFlags.MASK.value
         self.file_obj.seek(fp_data)
         if is_sparse:
@@ -231,18 +260,22 @@ class IGDReader:
             smallest to largest base-pair position.
         :return: The tuple (position, is_missing, samples).
         """
-        assert BitVector is not None, "Could not import BitVector; try 'pip install BitVector'"
+        assert (
+            BitVector is not None
+        ), "Could not import BitVector; try 'pip install BitVector'"
         self.file_obj.seek(self._get_var_idx_offset(variant_idx))
-        bpp, fp_data = struct.unpack("QQ", self.file_obj.read(IGDConstants.INDEX_ENTRY_BYTES))
-        flags = (bpp & BpPosFlags.MASK.value)
-        is_missing = (0 != (flags & BpPosFlags.IS_MISSING.value))
-        is_sparse = (0 != (flags & BpPosFlags.SPARSE.value))
+        bpp, fp_data = struct.unpack(
+            "QQ", self.file_obj.read(IGDConstants.INDEX_ENTRY_BYTES)
+        )
+        flags = bpp & BpPosFlags.MASK.value
+        is_missing = 0 != (flags & BpPosFlags.IS_MISSING.value)
+        is_sparse = 0 != (flags & BpPosFlags.SPARSE.value)
         position = bpp & ~BpPosFlags.MASK.value
         self.file_obj.seek(fp_data)
         byte_count = _div_round_up(self.num_samples, 8)
         if is_sparse:
             as_list = _read_u32_list(self.file_obj)
-            sample_bv = BitVector.BitVector(size=byte_count*8)
+            sample_bv = BitVector.BitVector(size=byte_count * 8)
             for sample_idx in as_list:
                 sample_bv[sample_idx] = 1
         else:
@@ -287,7 +320,9 @@ class IGDReader:
         if self._fp_ind_ids > 0:
             self.file_obj.seek(self._fp_ind_ids)
             count = _read_uint64(self.file_obj)
-            assert count == self._num_idv, f"Malformed file: {count} individual labels but expected {self._num_idv}"
+            assert (
+                count == self._num_idv
+            ), f"Malformed file: {count} individual labels but expected {self._num_idv}"
             for _ in range(count):
                 result.append(_read_string(self._version, self.file_obj))
         return result
@@ -303,7 +338,9 @@ class IGDReader:
         if self._fp_var_ids > 0:
             self.file_obj.seek(self._fp_var_ids)
             count = _read_uint64(self.file_obj)
-            assert count == self._num_var, f"Malformed file: {count} variant labels but expected {self._num_var}"
+            assert (
+                count == self._num_var
+            ), f"Malformed file: {count} variant labels but expected {self._num_var}"
             for _ in range(count):
                 result.append(_read_string(self._version, self.file_obj))
         return result
@@ -315,6 +352,7 @@ class IGDFile(IGDReader, AbstractContextManager):
 
     :param filename: The filename to open.
     """
+
     def __init__(self, filename: str):
         file_obj = open(filename, "rb")
         super().__init__(file_obj)
@@ -346,11 +384,26 @@ class IGDHeader:
     fp_variantids: int
 
     def pack(self) -> bytes:
-        return struct.pack(IGDConstants.HEADER_FORMAT,
-                           self.magic, self.version, self.ploidy, self.sparse_threshold,
-                           self.num_variants, self.num_individuals, self.flags, self.fp_index,
-                           self.fp_variants, self.fp_individualids, self.fp_variantids,
-                           0, 0, 0, 0, 0, 0)
+        return struct.pack(
+            IGDConstants.HEADER_FORMAT,
+            self.magic,
+            self.version,
+            self.ploidy,
+            self.sparse_threshold,
+            self.num_variants,
+            self.num_individuals,
+            self.flags,
+            self.fp_index,
+            self.fp_variants,
+            self.fp_individualids,
+            self.fp_variantids,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
 
 
 def _write_u64(file_obj, value):
@@ -383,26 +436,36 @@ class IGDWriter:
         theoretically the break-even point between sparse and dense representations (since the
         sparse representation uses 32-bit integers, and dense uses a bit per sample).
     """
-    def __init__(self,
-                 out_stream: BinaryIO,
-                 individuals: int,
-                 ploidy: int = 2,
-                 phased: bool = True,
-                 source: str = "",
-                 description: str = "",
-                 sparse_threshold: int = 32):
+
+    def __init__(
+        self,
+        out_stream: BinaryIO,
+        individuals: int,
+        ploidy: int = 2,
+        phased: bool = True,
+        source: str = "",
+        description: str = "",
+        sparse_threshold: int = 32,
+    ):
         self.out = out_stream
         self.header = IGDHeader(
-            magic=IGDConstants.HEADER_MAGIC, version=IGDConstants.SUPPORTED_FILE_VERSION,
-            ploidy=ploidy, sparse_threshold=sparse_threshold, num_variants=0,
+            magic=IGDConstants.HEADER_MAGIC,
+            version=IGDConstants.SUPPORTED_FILE_VERSION,
+            ploidy=ploidy,
+            sparse_threshold=sparse_threshold,
+            num_variants=0,
             num_individuals=individuals,
             flags=0 if not phased else IGDConstants.FLAG_IS_PHASED,
-            fp_index=0, fp_variants=0, fp_individualids=0, fp_variantids=0)
+            fp_index=0,
+            fp_variants=0,
+            fp_individualids=0,
+            fp_variantids=0,
+        )
         self.source = source
         self.description = description
-        self.ref_alleles = []
-        self.alt_alleles = []
-        self.index = []
+        self.ref_alleles: List[str] = []
+        self.alt_alleles: List[str] = []
+        self.index: List[bytes] = []
         self.num_samples = individuals * ploidy
         self.should_be_sparse = self.num_samples / sparse_threshold
         # The position of the last variant that we wrote. These have to be in order.
@@ -419,10 +482,9 @@ class IGDWriter:
         _write_str(self.out, self.description)
 
     @staticmethod
-    def _make_index_entry(position: int,
-                          is_missing: bool,
-                          is_sparse: bool,
-                          filepos: int) -> bytes:
+    def _make_index_entry(
+        position: int, is_missing: bool, is_sparse: bool, filepos: int
+    ) -> bytes:
         flags = 0
         if is_sparse:
             flags |= BpPosFlags.SPARSE.value
@@ -431,12 +493,14 @@ class IGDWriter:
         encoded_pos = position | flags
         return struct.pack("QQ", encoded_pos, filepos)
 
-    def write_variant(self,
-                      position: int,
-                      ref_allele: str,
-                      alt_allele: str,
-                      samples: List[int],
-                      is_missing: bool = False):
+    def write_variant(
+        self,
+        position: int,
+        ref_allele: str,
+        alt_allele: str,
+        samples: List[int],
+        is_missing: bool = False,
+    ):
         """
         Write the next variant, including sample information, to the file.
         Variants must be written in ascending order of their base pair position.
@@ -451,19 +515,24 @@ class IGDWriter:
             missing allele values at this position (in which case the reference and alt allele are
             somewhat irrelevant).
         """
-        assert position >= self.last_var_position, "Out of order variant (must be written in ascending order)"
+        assert (
+            position >= self.last_var_position
+        ), "Out of order variant (must be written in ascending order)"
         self.last_var_position = position
         self.ref_alleles.append(ref_allele)
         self.alt_alleles.append(alt_allele)
         is_sparse = len(samples) <= self.should_be_sparse
         filepos = self.out.tell()
         self.index.append(
-            self._make_index_entry(position, is_missing, is_sparse, filepos))
+            self._make_index_entry(position, is_missing, is_sparse, filepos)
+        )
         if is_sparse:
             _write_u32(self.out, len(samples))
             prev_sample = -1
             for sample_idx in samples:
-                assert prev_sample < sample_idx, "Sample indexes must be in ascending order"
+                assert (
+                    prev_sample < sample_idx
+                ), "Sample indexes must be in ascending order"
                 assert sample_idx < self.num_samples, "Invalid sample index"
                 _write_u32(self.out, sample_idx)
                 prev_sample = sample_idx
@@ -477,7 +546,7 @@ class IGDWriter:
                 element = sample_idx // 8
                 bit = 7 - (sample_idx % 8)
                 data[element] = data[element] | (1 << bit)
-            self.out.write(struct.pack("B"*num_bytes, *data))
+            self.out.write(struct.pack("B" * num_bytes, *data))
         self.header.num_variants += 1
 
     def write_index(self):
@@ -542,13 +611,19 @@ class IGDTransformer:
     :param use_bitvectors: If True, the modify_samples callback will be invoked with a
         BitVector for the samples instead of a List[int].
     """
-    def __init__(self,
-                 in_stream: BinaryIO,
-                 out_stream: BinaryIO,
-                 use_bitvectors: bool = False):
+
+    def __init__(
+        self, in_stream: BinaryIO, out_stream: BinaryIO, use_bitvectors: bool = False
+    ):
         self.reader = IGDReader(in_stream)
-        self.writer = IGDWriter(out_stream, self.reader.num_individuals, self.reader.ploidy,
-                                self.reader.is_phased, self.reader.source, self.reader.description)
+        self.writer = IGDWriter(
+            out_stream,
+            self.reader.num_individuals,
+            self.reader.ploidy,
+            self.reader.is_phased,
+            self.reader.source,
+            self.reader.description,
+        )
         self.use_bitvectors = use_bitvectors
 
     def transform(self):
@@ -576,16 +651,25 @@ class IGDTransformer:
                         if samples[s]:
                             samples_list.append(s)
                     samples = samples_list
-                self.writer.write_variant(position,
-                                          self.reader.get_ref_allele(i),
-                                          self.reader.get_alt_allele(i),
-                                          samples)
+                self.writer.write_variant(
+                    position,
+                    self.reader.get_ref_allele(i),
+                    self.reader.get_alt_allele(i),
+                    samples,
+                )
         self.writer.write_index()
         self.writer.write_variant_info()
         self.writer.write_individual_ids(self.reader.get_individual_ids())
-        self.writer.write_variant_ids(list(filter(lambda v: v is not None, variant_ids)))
+        self.writer.write_variant_ids(
+            list(filter(lambda v: v is not None, variant_ids))
+        )
         self.writer.out.seek(0)
         self.writer.write_header()
 
-    def modify_samples(self, position: int, is_missing: bool, samples: Union[BVType, List[int]]) -> Optional[Union[BVType, List[int]]]:
+    def modify_samples(
+        self,
+        position: int,
+        is_missing: bool,
+        samples: Union["BitVector.BitVector", List[int]],
+    ) -> Optional[Union["BitVector.BitVector", List[int]]]:
         raise NotImplementedError("Derived class must implement modify_samples()")
