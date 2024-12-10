@@ -6,7 +6,6 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum
 from typing import BinaryIO, List, Tuple, Union, Optional
-
 import struct
 
 # Optional import. BitVector is only needed when using the APIs that return them.
@@ -25,6 +24,14 @@ class BpPosFlags(Enum):
     MASK = 0xFF00000000000000
     SPARSE = 0x0100000000000000
     IS_MISSING = 0x0200000000000000
+
+
+# Left shift amount to get the numCopies value
+BP_POS_COPY_SHIFT = 48
+# Mask for getting only the numCopies value
+BP_POS_COPY_MASK = 0xFF << BP_POS_COPY_SHIFT
+# Mask for getting only the bp position value
+BP_POS_ONLY_MASK = ~(BpPosFlags.MASK.value | BP_POS_COPY_MASK)
 
 
 def _read_uint64(file_obj: BinaryIO) -> int:
@@ -178,9 +185,11 @@ class IGDReader:
     @property
     def num_samples(self):
         """
-        Number of haploid samples (same as num_individuals * ploidy).
+        Number of samples. For phased data, this is num_individuals * ploidy. For unphased
+        data this is just num_individuals. Every returned sample index (from get_samples())
+        will be less than num_samples.
         """
-        return self._num_idv * self._ploidy
+        return self._num_idv * self._ploidy if self.is_phased else self._num_idv
 
     @property
     def source(self):
@@ -199,6 +208,29 @@ class IGDReader:
     def _get_var_idx_offset(self, variant_idx: int) -> int:
         return self._fp_idx + (variant_idx * IGDConstants.INDEX_ENTRY_BYTES)
 
+    def get_position_flags_copies(self, variant_idx: int) -> Tuple[int, int, int]:
+        """
+        Given a variant index between 0...(num_variants-1), return the tuple (position, flags, num_copies).
+
+        Much faster than `get_samples` or `get_samples_bv` because it only scans the variant index
+        and does not read the actual genotype data.
+
+        :param variant_idx: Variant index between 0...(num_variants-1). Variants are ordered from
+            smallest to largest base-pair position.
+        :return: The tuple (position, flags, num_copies) where position is the base-pair position
+            (integer), flags is an integer that can be bitwise ANDed with BpPosFlags values, and
+            num_copies is an integer indicating how many copies of the alternate allele this
+            variant represents (for unphased data only).
+        """
+        self.file_obj.seek(self._get_var_idx_offset(variant_idx))
+        (bpp,) = struct.unpack(
+            "Q", self.file_obj.read(IGDConstants.INDEX_ENTRY_BYTES // 2)
+        )
+        flags = bpp & BpPosFlags.MASK.value
+        copies = (bpp & BP_POS_COPY_MASK) >> BP_POS_COPY_SHIFT
+        position = bpp & BP_POS_ONLY_MASK
+        return (position, flags, copies)
+
     def get_position_and_flags(self, variant_idx: int) -> Tuple[int, int]:
         """
         Given a variant index between 0...(num_variants-1), return the tuple (position, flags).
@@ -211,17 +243,21 @@ class IGDReader:
         :return: The tuple (position, flags) where position is the base-pair position (integer) and
             flags is an integer that can be bitwise ANDed with BpPosFlags values.
         """
+        assert self.is_phased, "Use get_position_flags_copies() for unphased data"
         self.file_obj.seek(self._get_var_idx_offset(variant_idx))
-        bpp, _ = struct.unpack("QQ", self.file_obj.read(IGDConstants.INDEX_ENTRY_BYTES))
+        (bpp,) = struct.unpack(
+            "Q", self.file_obj.read(IGDConstants.INDEX_ENTRY_BYTES // 2)
+        )
         flags = bpp & BpPosFlags.MASK.value
-        position = bpp & ~BpPosFlags.MASK.value
+        position = bpp & BP_POS_ONLY_MASK
         return (position, flags)
 
     def get_samples(self, variant_idx: int) -> Tuple[int, bool, List[int]]:
         """
         Given a variant index between 0...(num_variants-1), return the tuple (position, missing, samples)
         where position is the base-pair position, missing is True when this represents a row of missing
-        data, and samples is a list of sample indexes that have the alt allele for the given variant.
+        data, samples is a list of sample indexes that have the alt allele for the given variant, and
+        copies is the number of copies of the alternate allele (for unphased data only).
 
         When missing is True, the sample list contains samples that are missing the given variant.
 
@@ -236,7 +272,7 @@ class IGDReader:
         flags = bpp & BpPosFlags.MASK.value
         is_missing = 0 != (flags & BpPosFlags.IS_MISSING.value)
         is_sparse = 0 != (flags & BpPosFlags.SPARSE.value)
-        position = bpp & ~BpPosFlags.MASK.value
+        position = bpp & BP_POS_ONLY_MASK
         self.file_obj.seek(fp_data)
         if is_sparse:
             sample_list = _read_u32_list(self.file_obj)
@@ -270,7 +306,7 @@ class IGDReader:
         flags = bpp & BpPosFlags.MASK.value
         is_missing = 0 != (flags & BpPosFlags.IS_MISSING.value)
         is_sparse = 0 != (flags & BpPosFlags.SPARSE.value)
-        position = bpp & ~BpPosFlags.MASK.value
+        position = bpp & BP_POS_ONLY_MASK
         self.file_obj.seek(fp_data)
         byte_count = _div_round_up(self.num_samples, 8)
         if is_sparse:
@@ -466,7 +502,7 @@ class IGDWriter:
         self.ref_alleles: List[str] = []
         self.alt_alleles: List[str] = []
         self.index: List[bytes] = []
-        self.num_samples = individuals * ploidy
+        self.num_samples = (individuals * ploidy) if phased else individuals
         self.should_be_sparse = self.num_samples / sparse_threshold
         # The position of the last variant that we wrote. These have to be in order.
         self.last_var_position = 0
@@ -483,14 +519,14 @@ class IGDWriter:
 
     @staticmethod
     def _make_index_entry(
-        position: int, is_missing: bool, is_sparse: bool, filepos: int
+        position: int, is_missing: bool, is_sparse: bool, num_copies: int, filepos: int
     ) -> bytes:
         flags = 0
         if is_sparse:
             flags |= BpPosFlags.SPARSE.value
         if is_missing:
             flags |= BpPosFlags.IS_MISSING.value
-        encoded_pos = position | flags
+        encoded_pos = position | flags | (num_copies << BP_POS_COPY_SHIFT)
         return struct.pack("QQ", encoded_pos, filepos)
 
     def write_variant(
@@ -500,6 +536,7 @@ class IGDWriter:
         alt_allele: str,
         samples: List[int],
         is_missing: bool = False,
+        num_copies: int = 0,
     ):
         """
         Write the next variant, including sample information, to the file.
@@ -511,20 +548,25 @@ class IGDWriter:
         :param samples: The list of samples, as indexes. E.g. the list [4, 10] means that samples
             numbered 4 and 10 have this variant's alternate allele. This list must be in ascending
             order.
-        :param is_missing: Set to true if the sample list represents the list of samples that are
-            missing allele values at this position (in which case the reference and alt allele are
-            somewhat irrelevant).
+        :param is_missing: [Optional] Set to true if the sample list represents the list of samples
+            that are missing allele values at this position (in which case the reference and alt
+            allele are somewhat irrelevant).
+        :param num_copies: [Optional] For unphased data, set to the number of copies of the alternate
+            allele that this variant represents (1...ploidy).
         """
         assert (
             position >= self.last_var_position
         ), "Out of order variant (must be written in ascending order)"
+        assert (
+            self.header.flags & IGDConstants.FLAG_IS_PHASED
+        ) or num_copies > 0, "Unphased data must be written with num_copies specified to a non-zero value"
         self.last_var_position = position
         self.ref_alleles.append(ref_allele)
         self.alt_alleles.append(alt_allele)
         is_sparse = len(samples) <= self.should_be_sparse
         filepos = self.out.tell()
         self.index.append(
-            self._make_index_entry(position, is_missing, is_sparse, filepos)
+            self._make_index_entry(position, is_missing, is_sparse, num_copies, filepos)
         )
         if is_sparse:
             _write_u32(self.out, len(samples))
@@ -588,7 +630,8 @@ class IGDWriter:
         """
         Write the identifiers for the variants (optional).
 
-        :param labels: Empty list or a list of strings, one for each variant.
+        :param labels: Empty list or a list of strings, one for each variant. That is, if you called
+            write_variant() `X` times, then there should be `X` entries in this list.
         """
         if len(labels) == 0:
             self.header.fp_variantids = 0
@@ -636,11 +679,12 @@ class IGDTransformer:
         variant_ids = self.reader.get_variant_ids()
         self.writer.write_header()
         for i in range(self.reader.num_variants):
+            _, _, num_copies = self.reader.get_position_flags_copies(i)
             if self.use_bitvectors:
                 position, is_missing, samples = self.reader.get_samples_bv(i)
             else:
                 position, is_missing, samples = self.reader.get_samples(i)
-            samples = self.modify_samples(position, is_missing, samples)
+            samples = self.modify_samples(position, is_missing, samples, num_copies)
             if samples is None:
                 variant_ids[i] = None
             else:
@@ -656,6 +700,8 @@ class IGDTransformer:
                     self.reader.get_ref_allele(i),
                     self.reader.get_alt_allele(i),
                     samples,
+                    is_missing,
+                    num_copies,
                 )
         self.writer.write_index()
         self.writer.write_variant_info()
@@ -671,5 +717,6 @@ class IGDTransformer:
         position: int,
         is_missing: bool,
         samples: Union["BitVector.BitVector", List[int]],
+        num_copies: int = 0,
     ) -> Optional[Union["BitVector.BitVector", List[int]]]:
         raise NotImplementedError("Derived class must implement modify_samples()")
