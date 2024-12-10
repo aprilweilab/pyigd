@@ -29,6 +29,7 @@ def make_header(
         variants,
         individuals,
         0,
+        0,
         fp_idx,
         fp_vars,
         fp_indv,
