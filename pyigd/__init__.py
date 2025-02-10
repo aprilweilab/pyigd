@@ -75,6 +75,15 @@ def _samples_for_bv(data: bytes, index: int, sample_list: List[int]):
         bit += 1
 
 
+def flags_is_missing(flags: int):
+    """
+    Returns true if the flags specify that the variant represents missing data.
+
+    :param flags: The flags, e.g. as returned from `get_position_and_flags`
+    """
+    return bool(flags & BpPosFlags.IS_MISSING.value)
+
+
 # Internal constants shared between IGDReader and IGDWriter.
 class IGDConstants:
     NUM_HEADER_BYTES = 128
