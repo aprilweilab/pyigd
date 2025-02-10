@@ -19,6 +19,7 @@ def make_header(
     fp_idx=0,
     fp_vars=0,
     fp_indv=0,
+    phased=True,
 ):
     return struct.pack(
         IGDConstants.HEADER_FORMAT,
@@ -29,7 +30,7 @@ def make_header(
         variants,
         individuals,
         0,
-        0,
+        IGDConstants.FLAG_IS_PHASED if phased else 0,
         fp_idx,
         fp_vars,
         fp_indv,
