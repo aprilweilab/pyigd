@@ -11,7 +11,7 @@ if len(sys.argv) < 3:
 # the variant entirely.
 class MyXformer(pyigd.IGDTransformer):
     def modify_samples(self, position, is_missing, samples):
-        # BitVector version. The ith element being 1 means the ith sample has the variant.
+        # 1,0 vector version. The ith element being 1 means the ith sample has the variant.
         for i in range(len(samples)):
             if samples[i]:
                 samples[i] = 0

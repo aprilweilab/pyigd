@@ -5,15 +5,8 @@ Module for reading and writing Indexable Genotype Data (IGD) files.
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from enum import Enum
-from typing import BinaryIO, List, Tuple, Union, Optional
+from typing import BinaryIO, List, Tuple, Optional
 import struct
-
-# Optional import. BitVector is only needed when using the APIs that return them.
-try:
-    import BitVector  # type: ignore
-
-except ImportError:
-    BitVector = None
 
 
 class BpPosFlags(Enum):
@@ -71,6 +64,19 @@ def _samples_for_bv(data: bytes, index: int, sample_list: List[int]):
         is_set = 0 != (value & mask)
         if is_set:
             sample_list.append(sample_offset + bit)
+        value = (value << 1) & 0xFF
+        bit += 1
+
+
+def _bv_for_bv(data: bytes, index: int, result_bv: List[int]):
+    mask = 0x1 << 7
+    value = data[index]
+    sample_offset = index * 8
+    bit = 0
+    while value != 0:
+        is_set = 0 != (value & mask)
+        if is_set:
+            result_bv[sample_offset + bit] = 1
         value = (value << 1) & 0xFF
         bit += 1
 
@@ -306,9 +312,6 @@ class IGDReader:
             smallest to largest base-pair position.
         :return: The tuple (position, is_missing, samples).
         """
-        assert (
-            BitVector is not None
-        ), "Could not import BitVector; try 'pip install BitVector'"
         self.file_obj.seek(self._get_var_idx_offset(variant_idx))
         bpp, fp_data = struct.unpack(
             "QQ", self.file_obj.read(IGDConstants.INDEX_ENTRY_BYTES)
@@ -319,14 +322,15 @@ class IGDReader:
         position = bpp & BP_POS_ONLY_MASK
         self.file_obj.seek(fp_data)
         byte_count = _div_round_up(self.num_samples, 8)
+        sample_bv = [0 for _ in range(self.num_samples)]
         if is_sparse:
             as_list = _read_u32_list(self.file_obj)
-            sample_bv = BitVector.BitVector(size=byte_count * 8)
             for sample_idx in as_list:
                 sample_bv[sample_idx] = 1
         else:
             data = self.file_obj.read(byte_count)
-            sample_bv = BitVector.BitVector(rawbytes=data)
+            for i in range(byte_count):
+                _bv_for_bv(data, i, sample_bv)
         return (position, is_missing, sample_bv)
 
     def get_alt_allele(self, variant_idx: int) -> str:
@@ -665,7 +669,7 @@ class IGDTransformer:
     :param out_stream: The output stream for the output IGD file. Usually a file opened via
         mode "wb".
     :param use_bitvectors: If True, the modify_samples callback will be invoked with a
-        BitVector for the samples instead of a List[int].
+        a List if 1s and 0s, where position "i" being 1 means sample "i" has the alternate allele.
     """
 
     def __init__(
@@ -729,7 +733,7 @@ class IGDTransformer:
         self,
         position: int,
         is_missing: bool,
-        samples: Union["BitVector.BitVector", List[int]],
+        samples: List[int],
         num_copies: int = 0,
-    ) -> Optional[Union["BitVector.BitVector", List[int]]]:
+    ) -> Optional[List[int]]:
         raise NotImplementedError("Derived class must implement modify_samples()")
