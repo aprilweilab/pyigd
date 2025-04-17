@@ -2,7 +2,8 @@
 
 # pyigd
 
-PyIGD is a Python-only parser the [Indexable Genotype Data (IGD) format](https://github.com/aprilweilab/picovcf/blob/main/IGD.FORMAT.md).
+PyIGD is a Python-only parser the [Indexable Genotype Data (IGD) format](https://github.com/aprilweilab/picovcf/blob/main/IGD.FORMAT.md). We have a short
+[preprint paper](https://www.biorxiv.org/content/10.1101/2025.02.05.636549v1.abstract) that describes the format and some of its advantaged.
 
 For a C++ library that supports creating and parsing IGD, see [picovcf](https://github.com/aprilweilab/picovcf) (which also supports VCF -> IGD conversion).
 
