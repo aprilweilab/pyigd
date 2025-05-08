@@ -102,6 +102,20 @@ class IGDConstants:
     FLAG_IS_PHASED = 0x1
 
 
+@dataclass
+class VariantRow:
+    """
+    The expanded information associated with a single "row" in the IGD format.
+    """
+
+    variant_index: int
+    is_missing: bool
+    ref: str
+    alt: str
+    num_copies: int
+    samples: List[int]
+
+
 class IGDReader:
     """
     Construct an IGDReader object for reading data from a file.
@@ -394,6 +408,41 @@ class IGDReader:
             for _ in range(count):
                 result.append(_read_string(self._version, self.file_obj))
         return result
+
+    def collect_site_samples(
+        self, variant_index: int
+    ) -> Tuple[int, List[VariantRow], int]:
+        """
+        Starting at variant_index, going forward, collect all of the variant rows for the
+        same site and return them.
+
+        :param variant_index: The variant_index to start scanning from.
+        :type variant_index: int
+        :return: A triple (position, results, next_variant_index). The position is the site's
+            position. The next_variant_index is the first index of a variant after this which
+             belongs to a different site. The results list contains VariantRow objects for
+             each of the variants sharing the "current" site.
+        :rtype: Tuple[int, List[VariantRow], int]
+        """
+        results = []
+        site_position, _ = self.get_position_and_flags(variant_index)
+        while variant_index < self.num_variants:
+            position, _, num_copies = self.get_position_flags_copies(variant_index)
+            if position != site_position:
+                break
+            _, is_missing, samples = self.get_samples(variant_index)
+            results.append(
+                VariantRow(
+                    variant_index=variant_index,
+                    is_missing=is_missing,
+                    ref=self.get_ref_allele(variant_index),
+                    alt=self.get_alt_allele(variant_index),
+                    num_copies=num_copies,
+                    samples=samples,
+                )
+            )
+            variant_index += 1
+        return position, results, variant_index
 
 
 class IGDFile(IGDReader, AbstractContextManager):
