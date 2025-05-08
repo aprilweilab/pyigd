@@ -1,4 +1,4 @@
-from pyigd import IGDReader, IGDConstants, BpPosFlags
+from pyigd import IGDReader, IGDConstants, BpPosFlags, VariantRow
 from pyigd import IGDFile  # TODO: remove
 import unittest
 import struct
@@ -119,7 +119,11 @@ class IGDTestFile(tempfile.TemporaryDirectory):
             else:
                 fp_varids = 0
 
-            fp_vars = 0
+            # Just use A/G as every reference/alternate.
+            fp_vars = f.tell()
+            for _ in range(len(self.variants)):
+                _write_str(self.ver3, f, "A")  # REF
+                _write_str(self.ver3, f, "G")  # ALT
 
             # Gross. If this wasn't test code I wouldn't do this...
             # We're just updating the last few fields of the header to set the file locations.
@@ -269,6 +273,81 @@ class CompatTests(unittest.TestCase):
                 self.assertEqual(igd_file.num_individuals, I)
                 self.assertEqual(igd_file.num_variants, V)
                 self.assertEqual(igd_file.ploidy, 2)
+
+    def test_site_iterate(self):
+        variants = [
+            (10, False, [1, 2, 3, 4], None),
+            (10, False, [5, 6, 7, 8], None),
+            (11, False, [10], None),
+            (15, True, [1], None),
+            (15, False, [19], None),
+        ]
+
+        with IGDTestFile(
+            make_header(individuals=10, variants=len(variants)), variants
+        ) as tmpdir:
+            result = []
+            filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
+            with open(filename, "rb") as f:
+                igd_file = IGDReader(f)
+                i = 0
+                while i < igd_file.num_variants:
+                    position, site_variants, i = igd_file.collect_site_samples(i)
+                    self.assertTrue(position in (10, 11, 15))
+                    result.append(site_variants)
+
+            # The IGDTestFile always uses A/G as ref/alt.
+            self.assertEqual(
+                result,
+                [
+                    [
+                        VariantRow(
+                            variant_index=0,
+                            is_missing=False,
+                            ref="A",
+                            alt="G",
+                            num_copies=0,
+                            samples=[1, 2, 3, 4],
+                        ),
+                        VariantRow(
+                            variant_index=1,
+                            is_missing=False,
+                            ref="A",
+                            alt="G",
+                            num_copies=0,
+                            samples=[5, 6, 7, 8],
+                        ),
+                    ],
+                    [
+                        VariantRow(
+                            variant_index=2,
+                            is_missing=False,
+                            ref="A",
+                            alt="G",
+                            num_copies=0,
+                            samples=[10],
+                        )
+                    ],
+                    [
+                        VariantRow(
+                            variant_index=3,
+                            is_missing=True,
+                            ref="A",
+                            alt="G",
+                            num_copies=0,
+                            samples=[1],
+                        ),
+                        VariantRow(
+                            variant_index=4,
+                            is_missing=False,
+                            ref="A",
+                            alt="G",
+                            num_copies=0,
+                            samples=[19],
+                        ),
+                    ],
+                ],
+            )
 
 
 if __name__ == "__main__":

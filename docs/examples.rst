@@ -184,6 +184,29 @@ are the same:
     print("Positions are identical")
 
 
+Traverse by site instead of variant
+-----------------------------------
+
+Use the :py:meth:`pyigd.IGDReader.collect_site_samples` method to traverse the data by site instead of
+by variant. This method collects all variants for the next site into a list of :py:type:`pyigd.VariantRow`
+objects.
+
+::
+
+  import pyigd
+
+  with open("myfile.igd", "rb") as f:
+    igd_file = pyigd.IGDReader(f)
+    while variant_index < igd_file.num_variants:
+      position, rows, variant_index = igd_file.collect_site_samples(variant_index)
+
+      # Number of samples that have _any alternate allele_ at the site:
+      alt_count = sum([len(r.samples) for r in rows if not r.is_missing])
+
+      print(f"At site {position} there are {len(rows)} variants and {alt_count} total alternate alleles")
+
+
+
 IGD Transformation
 ~~~~~~~~~~~~~~~~~~
 
