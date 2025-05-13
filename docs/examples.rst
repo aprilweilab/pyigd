@@ -67,6 +67,25 @@ found by scanning the IGD index:
         # Do something with sample_list
 
 
+Or even more efficient is to use :py:meth:`pyigd.IGDReader.lower_bound_position` to binary search for
+first position greater-than-or-equal-to the start of the range, and then traverse until the end.
+
+::
+
+  import pyigd
+
+  my_range = (5_000_000, 10_000_000)  # 5MBP to 10MBP
+  with open("myfile.igd", "rb") as f:
+    igd_file = pyigd.IGDReader(f)
+    variant_index = igd_file.lower_bound_position(my_range[0])
+    while variant_index < igd_file.num_variants:
+      position, flags = igd_file.get_position_and_flags(variant_index)
+      if position >= my_range[1]:
+        break
+      _, _, sample_list = igd_file.get_samples(variant_index)
+      # Do something with sample_list
+
+
 Runs of homozygosity
 --------------------
 

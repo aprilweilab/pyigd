@@ -395,6 +395,30 @@ class IGDReader:
                 result.append(_read_string(self._version, self.file_obj))
         return result
 
+    def lower_bound_position(self, position) -> int:
+        """
+        Return the first variant index with position that is greater than or equal to the given position.
+        Will return `num_variants` if the given position is greater than all positions in the IGD.
+
+        :param position: The position to search for.
+        :type position: int
+        :return: The first variant index with position greater than or equal to the given position.
+        :rtype: int
+        """
+        low = 0
+        high = self.num_variants - 1
+        mid = high
+        while low <= high:
+            mid = low + ((high - low) // 2)
+            mid_pos, _ = self.get_position_and_flags(mid)
+            if mid_pos < position:
+                low = mid + 1
+            elif mid_pos > position:
+                high = mid - 1
+            else:
+                return mid
+        return low
+
 
 class IGDFile(IGDReader, AbstractContextManager):
     """
