@@ -238,6 +238,27 @@ class ReaderTests(unittest.TestCase):
                 igd_file = IGDReader(f)
                 self.assertEqual(igd_file.get_variant_ids(), [v[3] for v in variants])
 
+    def test_lower_bound(self):
+        V = 21
+        variants = [(i * 10, False, [], str(i)) for i in range(V)]
+        with IGDTestFile(make_header(variants=V), variants=variants) as tmpdir:
+            filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
+            with open(filename, "rb") as f:
+                igd_file = IGDReader(f)
+
+                self.assertEqual(0, igd_file.lower_bound_position(0))
+                self.assertEqual(
+                    igd_file.num_variants, igd_file.lower_bound_position(100_000)
+                )
+                self.assertEqual(1, igd_file.lower_bound_position(10))
+                self.assertEqual(9, igd_file.lower_bound_position(90))
+                self.assertEqual(10, igd_file.lower_bound_position(91))
+                self.assertEqual(10, igd_file.lower_bound_position(92))
+                self.assertEqual(10, igd_file.lower_bound_position(93))
+                self.assertEqual(10, igd_file.lower_bound_position(99))
+                self.assertEqual(10, igd_file.lower_bound_position(100))
+                self.assertEqual(11, igd_file.lower_bound_position(101))
+
 
 class CompatTests(unittest.TestCase):
     def test_bad_header_ver(self):
