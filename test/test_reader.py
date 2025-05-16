@@ -119,7 +119,11 @@ class IGDTestFile(tempfile.TemporaryDirectory):
             else:
                 fp_varids = 0
 
-            fp_vars = 0
+            # Just use A/G as every reference/alternate.
+            fp_vars = f.tell()
+            for _ in range(len(self.variants)):
+                _write_str(self.ver3, f, "A")  # REF
+                _write_str(self.ver3, f, "G")  # ALT
 
             # Gross. If this wasn't test code I wouldn't do this...
             # We're just updating the last few fields of the header to set the file locations.
