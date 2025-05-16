@@ -1,5 +1,4 @@
 from pyigd import IGDReader, IGDConstants, BpPosFlags
-from pyigd import IGDFile  # TODO: remove
 import unittest
 import struct
 import tempfile
@@ -119,7 +118,11 @@ class IGDTestFile(tempfile.TemporaryDirectory):
             else:
                 fp_varids = 0
 
-            fp_vars = 0
+            # Just use A/G as every reference/alternate.
+            fp_vars = f.tell()
+            for _ in range(len(self.variants)):
+                _write_str(self.ver3, f, "A")  # REF
+                _write_str(self.ver3, f, "G")  # ALT
 
             # Gross. If this wasn't test code I wouldn't do this...
             # We're just updating the last few fields of the header to set the file locations.
@@ -139,16 +142,6 @@ class ReaderTests(unittest.TestCase):
             filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
             with open(filename, "rb") as f:
                 igd_file = IGDReader(f)
-                self.assertEqual(igd_file.description, TEST_DESCRIPTION)
-                self.assertEqual(igd_file.source, TEST_SOURCE)
-                self.assertEqual(igd_file.num_individuals, 0)
-                self.assertEqual(igd_file.num_variants, 0)
-                self.assertEqual(igd_file.ploidy, 2)
-
-    def test_good_header_no_data_old_style(self):
-        with IGDTestFile(make_header()) as tmpdir:
-            filename = os.path.join(tmpdir, IGDTestFile.FILENAME)
-            with IGDFile(filename) as igd_file:
                 self.assertEqual(igd_file.description, TEST_DESCRIPTION)
                 self.assertEqual(igd_file.source, TEST_SOURCE)
                 self.assertEqual(igd_file.num_individuals, 0)
