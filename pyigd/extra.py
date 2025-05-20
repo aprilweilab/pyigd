@@ -3,6 +3,7 @@ Extra functionality that is not core to accessing an IGD, but helpful for manipu
 the information in/related to an IGD.
 """
 
+from pyigd.readwrite import flags_is_missing
 from typing import List
 
 try:
@@ -43,6 +44,11 @@ def get_inverse_sample_list(igd_reader, variant_indices: List[int]) -> List[List
     invert that list. Works for both phased and unphased data. One usage for this function is to get an explicit
     list of samples that have the reference, since the reference is stored implicitly in an IGD.
 
+    If the input data has overlapping variants that add up to more than PLOIDY for some samples, then
+    we return an empty list. In real data this can happen at sites containing indels/SVs, depending
+    on how the dataset was created. If you don't want this behavior (skipping the whole site) then
+    you must filter out these problematic variants in the IGD file.
+
     :param igd_reader: The IGDReader representing the IGD file.
     :type igd_reader: IGDReader
     :param variant_indices: The indices of the variants who total sample set (i.e., all of them unioned together)
@@ -62,10 +68,14 @@ def get_inverse_sample_list(igd_reader, variant_indices: List[int]) -> List[List
         igd_reader.num_samples, 1 if igd_reader.is_phased else ploidy, dtype=numpy.int32
     )
     for i in variant_indices:
-        _, _, num_copies = igd_reader.get_position_flags_copies(i)
-        # For phased data.
+        _, flags, num_copies = igd_reader.get_position_flags_copies(i)
         if num_copies == 0:
-            num_copies = 1
+            # For phased data.
+            if igd_reader.is_phased:
+                num_copies = 1
+            # We could also assert this, but more robust to just force it to happen.
+            elif flags_is_missing(flags):
+                num_copies = ploidy
         _, _, samples = igd_reader.get_samples(i)
         this_vector = numpy.zeros(igd_reader.num_samples, dtype=numpy.int32)
         numpy.put(this_vector, samples, num_copies)

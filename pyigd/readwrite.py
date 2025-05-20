@@ -598,9 +598,13 @@ class IGDWriter:
         assert (
             position >= self.last_var_position
         ), "Out of order variant (must be written in ascending order)"
+        is_phased = self.header.flags & IGDConstants.FLAG_IS_PHASED
         assert (
-            self.header.flags & IGDConstants.FLAG_IS_PHASED
-        ) or num_copies > 0, "Unphased data must be written with num_copies specified to a non-zero value"
+            is_phased or num_copies > 0
+        ), "Unphased data must be written with num_copies specified to a non-zero value"
+        assert num_copies == self.header.ploidy or not (
+            not is_phased and is_missing
+        ), "Unphased missing rows must have num_copies equal to ploidy (missingness is for an entire individual)"
         self.last_var_position = position
         self.ref_alleles.append(ref_allele)
         self.alt_alleles.append(alt_allele)

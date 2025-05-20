@@ -32,7 +32,10 @@ class IGDTestFile20(tempfile.TemporaryDirectory):
             writer = IGDWriter(f, individuals=self.INDIVS, phased=not unphased)
             writer.write_header()
             for pos, ref, alt, samples, num_copies in self.variants:
-                writer.write_variant(pos, ref, alt, samples, False, num_copies)
+                is_missing = False
+                if len(alt) == 0:
+                    is_missing = True
+                writer.write_variant(pos, ref, alt, samples, is_missing, num_copies)
             writer.write_index()
             writer.write_variant_info()
             writer.out.seek(0)
@@ -91,20 +94,15 @@ class ReaderTests(unittest.TestCase):
     def test_site_iterate_unphased(self):
         positions = [1, 1, 1, 2, 2, 3, 3, 3]
         refs = ["A", "A", "A", "T", "T", "C", "C", "C"]
-        alts = ["G", "C", "C", "A", "A", "T", "A", "T"]
+        alts = ["G", "", "C", "A", "A", "T", "A", "T"]
         num_copies = [1, 2, 1, 1, 2, 1, 1, 2]
         samples = [
             [1, 5],
             [2, 6],
             [5, 12, 13],
             [1, 2, 3, 4, 5, 6, 7],
-            [
-                18,
-            ],
-            [
-                18,
-                19,
-            ],
+            [18],
+            [18, 19],
             [11, 18, 19, 15],
             [1, 2, 3, 4],
         ]
