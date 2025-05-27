@@ -306,7 +306,7 @@ allelic sites there may still be another alternate allele at the site with a fre
   import pyigd
 
   class RemoveLF(pyigd.IGDTransformer):
-    def modify_samples(self, position, is_missing, samples):
+    def modify_samples(self, position, is_missing, samples, num_copies):
       frequency = len(samples) / self.reader.num_samples
       if frequency < 0.01:
         return None # None means "delete this variant"
@@ -331,7 +331,7 @@ pair range.
   my_range = (5_000_000, 10_000_000)  # 5MBP to 10MBP
 
   class KeepRange(pyigd.IGDTransformer):
-    def modify_samples(self, position, is_missing, samples):
+    def modify_samples(self, position, is_missing, samples, num_copies):
       if position >= my_range[0] and position < my_range[1]:
         return samples
       return None # Delete the entire variant
