@@ -6,6 +6,10 @@ and identifiers for the individuals corresponding to those samples. The genotype
 The sample index ``i`` ranges from ``0`` to ``N-1``, where ``N`` is the number of haplotypes. Sample indices are grouped
 by individual, so given a ploidy ``P``, every ``P`` consecutive sample indices will be for the same individual.
 
+IGD files are read with :py:class:`pyigd.IGDReader`. They can be written with :py:class:`pyigd.IGDWriter`. There is a helpful
+class :py:class:`pyigd.IGDTransformer` that lets you modify an existing IGD file (creating a copy of it) in very few lines
+of code. See the `examples <examples.html>`_ or the `API documentation <pyigd.html>`_ for details.
+
 Variants
 --------
 
@@ -68,12 +72,14 @@ is probably no reason to use IGD (you need a non-sparse representation like VCF/
 
 There are two ways to export this metadata:
 
-1. During VCF->IGD conversion: ``igdtools in.vcf.gz -o out.igd -e all``
+1. During VCF-to-IGD conversion: ``igdtools in.vcf.gz -o out.igd -e all``
 
 2. Only export metadata from a VCF: ``igdtools in.vcf.gz -e all``
 
 The metadata is stored as a file per metadata item type. The supported fields are CHROM, QUAL, FILTER, and INFO. For INFO, each
 key gets its own file.  All metadata files are a single entry (line) per variant in the resulting IGD file (i.e., "expanded" variants).
+The files are stored in a ``<prefix>.meta/`` directory, where the prefix is determined by the output file (for conversion) or input
+file (when you are just exporting metadata).
 
 The first line of a metadata file is a comment that has information about the metadata. When loaded with ``numpy.loadtxt()``, the size of
 the array is exactly :py:meth:`pyigd.IGDReader.num_variants` in length, and if you index variant ``i`` in the IGD file you can get its metadata by
@@ -100,3 +106,10 @@ VCF file that we converted and exported metadata for.
             position, flags = igd_file.get_position_and_flags(i)
             ac_value = ac_meta_data[i]
             print(f"Variant={i}, Position={position}, AC={ac_value}")
+
+
+When an IGD file has been modified/filtered after the metadata was exported, you'll need to match up the variant identifiers between the
+two files. When metadata is exported, there is always a ``variants.txt`` file that is the variant identifiers associated with the metadata
+at the time of export, so you just need to match those identifiers up with whatever identifiers your IGD file contains, to find the correct
+metadata rows. See the `examples page <examples.html>`_ for an example that uses `numpy.intersect1d <https://numpy.org/doc/stable/reference/generated/numpy.intersect1d.html>`_
+to do this efficiently.

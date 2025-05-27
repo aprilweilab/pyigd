@@ -395,3 +395,62 @@ methods.
 
 Note: the above does a column-wise traversal of the numpy matrix, but it may be more
 efficient to first transpose the genotype matrix and then do a row-wise traversal.
+
+Metadata
+~~~~~~~~
+
+The metadata is stored separately from the IGD file, in a ``*.meta/`` directory. Each file contains
+one metadata array associated with the variants in the IGD file. `numpy.loadtxt <https://numpy.org/doc/2.2/reference/generated/numpy.loadtxt.html>`_
+can be used to load the data, and each element in the resulting (1-dimensional) ``numpy.array`` is
+the metadata item for that variant index in the IGD file.
+
+For example, consider variant with index ``0 <= j < igd_file.num_variants``. We can use :py:meth:`pyigd.IGDReader.get_position_and_flags`
+to get the position of variant ``j``, and given a metadata vector ``meta`` (as loaded by ``numpy.loadtxt``) we can
+get that metadata for variant ``j`` via ``meta[j]``.
+
+This is all pretty simple until you modify the IGD file after the metadata has been exported, e.g.
+by filtering out some variants. Below is an example that shows you how to match up the variant IDs from
+the newly filtered IGD file to the original metadata (which always stores the variant IDs in ``variants.txt``).
+This example assumes that you converted a VCF file containing the ``AC`` (allele counts) field from the
+``INFO`` column.
+
+::
+
+  import numpy
+  import pyigd
+
+  # The original IGD file was called "original.igd", and it was created via: igdtools some.vcf.gz -o original.igd -e all
+  original_ids = numpy.loadtxt("original.meta/variants.txt", dtype=str)
+  original_ac = numpy.loadtxt("original.meta/info.AC.txt", dtype=int)
+  assert len(original_ids) == len(original_ac)
+
+  # Now filter "original.igd" to remove all odd-numbered base-pair positions. This is just a silly example of filtering,
+  # to illustrate how metadata is handled after filtering.
+  class OddXformer(pyigd.IGDTransformer):
+      def modify_samples(self, position, is_missing, samples, num_copies):
+          if position % 2 == 1:
+              return None
+          return samples
+
+  with open("original.igd", "rb") as fin, open("filtered.igd", "wb") as fout:
+      xformer = OddXformer(fin, fout)
+      xformer.transform()
+
+  # Now open our filtered IGD file, and print out the variant positions plus the corresponding AC value from the metadata
+  with open("filtered.igd", "rb") as f:
+      igd_file = pyigd.IGDReader(f)
+      # The variant IDs that we still have after filtering
+      remaining_ids = numpy.array(igd_file.get_variant_ids())
+
+      # Find the indices for the intersection of the variant IDs between the metadata and the filtered IGD.
+      _, metadata_indices, remaining_indices = numpy.intersect1d(original_ids, remaining_ids, return_indices=True)
+      assert len(metadata_indices) == igd_file.num_variants
+      # Sort according to the indices in the filtered IGD file. This way we can just use metadata_indices directly,
+      # where metadata_indices[0] is the index into the metadata for the 0th variant in filtered.igd, etc.
+      metadata_indices = metadata_indices[numpy.argsort(remaining_indices)]
+
+      # Traverse the filtered variants and their metadata indices together
+      for variant_index, metadata_index in zip(range(igd_file.num_variants), metadata_indices):
+          assert remaining_ids[variant_index] == original_ids[metadata_index]
+          pos, flags = igd_file.get_position_and_flags(variant_index)
+          print(f"Position: {pos}, AC={original_ac[metadata_index]}")
