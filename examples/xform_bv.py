@@ -10,7 +10,7 @@ if len(sys.argv) < 3:
 # in general you can change the sample list any way you want. Return None to delete
 # the variant entirely.
 class MyXformer(pyigd.IGDTransformer):
-    def modify_samples(self, position, is_missing, samples):
+    def modify_samples(self, position, is_missing, samples, num_copies):
         # 1,0 vector version. The ith element being 1 means the ith sample has the variant.
         for i in range(len(samples)):
             if samples[i]:

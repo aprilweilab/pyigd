@@ -10,7 +10,7 @@ if len(sys.argv) < 3:
 # in general you can change the sample list any way you want. Return None to delete
 # the variant entirely.
 class MyXformer(pyigd.IGDTransformer):
-    def modify_samples(self, position, is_missing, samples):
+    def modify_samples(self, position, is_missing, samples, num_copies):
         return samples[1:]
 
 
