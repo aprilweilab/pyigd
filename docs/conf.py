@@ -9,9 +9,8 @@ import os
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "pyigd"
-copyright = "2024, Drew DeHaas"
+copyright = "2025, Drew DeHaas"
 author = "Drew DeHaas"
-release = "0.2"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
