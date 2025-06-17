@@ -490,7 +490,7 @@ def _write_u32(file_obj, value):
     file_obj.write(struct.pack("I", value))
 
 
-def _write_str(file_obj, string):
+def _write_string(file_obj, string):
     _write_u32(file_obj, len(string))
     file_obj.write(string.encode("utf-8"))
 
@@ -555,8 +555,8 @@ class IGDWriter:
         """
         assert self.out.tell() == 0, "Writing header to wrong location"
         self.out.write(self.header.pack())
-        _write_str(self.out, self.source)
-        _write_str(self.out, self.description)
+        _write_string(self.out, self.source)
+        _write_string(self.out, self.description)
 
     @staticmethod
     def _make_index_entry(
@@ -653,8 +653,8 @@ class IGDWriter:
         assert len(self.alt_alleles) == self.header.num_variants
         self.header.fp_variants = self.out.tell()
         for i in range(self.header.num_variants):
-            _write_str(self.out, self.ref_alleles[i])
-            _write_str(self.out, self.alt_alleles[i])
+            _write_string(self.out, self.ref_alleles[i])
+            _write_string(self.out, self.alt_alleles[i])
 
     def write_individual_ids(self, labels: List[str]):
         """
@@ -669,7 +669,7 @@ class IGDWriter:
             self.header.fp_individualids = self.out.tell()
             _write_u64(self.out, len(labels))
             for label in labels:
-                _write_str(self.out, label)
+                _write_string(self.out, label)
 
     def write_variant_ids(self, labels: List[str]):
         """
@@ -685,7 +685,7 @@ class IGDWriter:
             self.header.fp_variantids = self.out.tell()
             _write_u64(self.out, len(labels))
             for label in labels:
-                _write_str(self.out, label)
+                _write_string(self.out, label)
 
 
 class IGDTransformer:
