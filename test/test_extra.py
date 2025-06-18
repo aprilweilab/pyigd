@@ -1,5 +1,5 @@
 from pyigd import IGDReader, IGDWriter
-from pyigd.extra import collect_next_site, get_inverse_sample_list
+from pyigd.extra import collect_next_site, get_inverse_sample_list, igd_merge
 import unittest
 import tempfile
 import os
@@ -38,13 +38,15 @@ class IGDTestFile20(tempfile.TemporaryDirectory):
                 writer.write_variant(pos, ref, alt, samples, is_missing, num_copies)
             writer.write_index()
             writer.write_variant_info()
+            writer.write_individual_ids([f"indiv{i}" for i in range(self.INDIVS)])
+            writer.write_variant_ids([f"var{i}" for i in range(len(self.variants))])
             writer.out.seek(0)
             writer.write_header()
 
         return tmpdir
 
 
-class ReaderTests(unittest.TestCase):
+class SiteIterationsTests(unittest.TestCase):
     def test_site_iterate_phased(self):
         positions = [1, 1, 2, 2, 3, 3, 3]
         refs = ["A", "A", "T", "T", "C", "C", "C"]
@@ -167,3 +169,76 @@ class ReaderTests(unittest.TestCase):
                         [0, 5, 6, 7, 8, 9, 10, 12, 13, 14, 16, 17],  # Third site
                     ],
                 )
+
+
+class IGDMergeTests(unittest.TestCase):
+    def test_dup(self):
+        positions = [1, 1, 2, 2, 3, 3, 3]
+        refs = ["A", "A", "T", "T", "C", "C", "C"]
+        alts = ["G", "C", "G", "A", "T", "A", "G"]
+        samples = [
+            [1, 5],
+            [2, 6],
+            list(range(10)),
+            list(range(10, 20)),
+            list(range(0, 5)),
+            list(range(10, 15)),
+            list(range(25, 30)),
+        ]
+        with IGDTestFile20(positions, refs, alts, samples) as tmpdir1, IGDTestFile20(
+            positions, refs, alts, samples
+        ) as tmpdir2:
+            filename1 = os.path.join(tmpdir1, IGDTestFile20.FILENAME)
+            filename2 = os.path.join(tmpdir2, IGDTestFile20.FILENAME)
+
+            try:
+                files = [open(fn, "rb") for fn in [filename1, filename2]]
+                readers = [IGDReader(f) for f in files]
+                # Cannot merge the same IGD twice
+                with self.assertRaises(AssertionError) as context:
+                    igd_merge("merged.igd", readers, force_overwrite=True)
+            finally:
+                [f.close() for f in files]
+
+    def test_ok_overlap(self):
+        # These positions overlap, but that is ok because it is only the first
+        # and last positions being the same.
+        positions = [[3, 4, 5], [1, 2, 3]]
+        refs = [["T", "C", "C"], ["A", "A", "T"]]
+        alts = [["A", "A", "G"], ["G", "C", "G"]]
+        samples = [
+            [[1, 5], [2, 6], list(range(10))],
+            [list(range(10, 20)), list(range(0, 5)), list(range(10, 15))],
+        ]
+        with IGDTestFile20(
+            positions[0], refs[0], alts[0], samples[0]
+        ) as tmpdir1, IGDTestFile20(
+            positions[1], refs[1], alts[1], samples[1]
+        ) as tmpdir2:
+            filename1 = os.path.join(tmpdir1, IGDTestFile20.FILENAME)
+            filename2 = os.path.join(tmpdir2, IGDTestFile20.FILENAME)
+            outfile = os.path.join(tmpdir1, "merged.igd")
+            try:
+                files = [open(fn, "rb") for fn in [filename1, filename2]]
+                readers = [IGDReader(f) for f in files]
+                igd_merge(outfile, readers, force_overwrite=True)
+            finally:
+                [f.close() for f in files]
+
+            with open(outfile, "rb") as newf:
+                new_reader = IGDReader(newf)
+                self.assertEqual(new_reader.num_samples, 40)
+                self.assertEqual(new_reader.ploidy, 2)
+                self.assertEqual(new_reader.num_variants, 6)
+                self.assertEqual(new_reader.get_alt_allele(3), "A")
+                self.assertEqual(new_reader.get_ref_allele(5), "C")
+                self.assertEqual(
+                    [
+                        new_reader.get_position_flags_copies(i)[0]
+                        for i in range(new_reader.num_variants)
+                    ],
+                    [1, 2, 3, 3, 4, 5],
+                )
+                self.assertEqual(len(new_reader.get_variant_ids()), 6)
+                self.assertEqual(len(new_reader.get_individual_ids()), 20)
+                self.assertEqual(new_reader.get_individual_ids()[4], "indiv4")

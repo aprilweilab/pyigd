@@ -8,6 +8,7 @@ from pyigd.readwrite import (
     _read_uint32,
     _read_string,
     _write_string,
+    _write_u64,
     BpPosFlags,
     IGDConstants,
     IGDReader,
@@ -146,6 +147,7 @@ def igd_merge(
     phased = in_readers[0].is_phased
     source = f"igd_merge({in_readers[0].source})"
     description = in_readers[0].description if description is None else description
+    write_variant_ids = False
     for reader in in_readers:
         assert reader.ploidy == ploidy, "Multiple ploidy values in input IGDs"
         assert (
@@ -154,6 +156,8 @@ def igd_merge(
         assert reader.is_phased == phased, "Different phasedness in input IGDs"
         assert reader.num_variants > 0, "Empty IGD provided (no variants)"
         assert reader.version > 3, "Not support for old IGD file format versions"
+        if reader.has_variant_ids:
+            write_variant_ids = True
 
     # Now sort the input readers according to their first variant, and then ensure no overlap.
     in_readers.sort(key=lambda r: r.get_position_flags_copies(0)[0])
@@ -245,12 +249,21 @@ def igd_merge(
                 _write_string(writer.out, alt)
 
         #   INDIVIDUAL IDS (input1) -- optional
-        # TODO
+        indiv_ids = in_readers[0].get_individual_ids()
+        writer.write_individual_ids(indiv_ids)
 
         #   VARIANT IDS (input1)
         #   ...
         #   VARIANT IDS (input2)
-        # TODO
+        if write_variant_ids:
+            writer.header.fp_variantids = writer.out.tell()
+            _write_u64(writer.out, writer.header.num_variants)
+            for r in in_readers:
+                vids = r.get_variant_ids()
+                if len(vids) < r.num_variants:
+                    vids.extend([""] * (r.num_variants - len(vids)))
+                for label in vids:
+                    _write_string(writer.out, label)
 
         writer.out.seek(0)
         writer.write_header()

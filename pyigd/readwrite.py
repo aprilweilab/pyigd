@@ -377,6 +377,13 @@ class IGDReader:
                 result.append(_read_string(self._version, self.file_obj))
         return result
 
+    @property
+    def has_variant_ids(self) -> bool:
+        """
+        True if there are variant IDs in this IGD file.
+        """
+        return self._fp_var_ids > 0
+
     def get_variant_ids(self) -> List[str]:
         """
         Get a list of identifiers for the variants in this dataset. The 0th variants's label
