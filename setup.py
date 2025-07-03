@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 import os
 
 PACKAGE_NAME = "pyigd"
-VERSION = "1.2"
+VERSION = "1.3"
 
 THISDIR = os.path.dirname(os.path.realpath(__file__))
 with open(os.path.join(THISDIR, "README.md")) as f:
