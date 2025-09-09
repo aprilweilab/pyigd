@@ -183,7 +183,9 @@ def igd_merge(
             flags = bpp & BpPosFlags.MASK.value
             is_sparse = 0 != (flags & BpPosFlags.SPARSE.value)
             if is_sparse:
-                byte_count = _read_uint32(reader.file_obj) * 4
+                reader.file_obj.seek(start_offset)
+                # The +4 is for the uint32 that holds the sparse list length
+                byte_count = (_read_uint32(reader.file_obj) * 4) + 4
             else:
                 byte_count = _div_round_up(reader.num_samples, 8)
             return start_offset + byte_count, bpp
@@ -197,9 +199,11 @@ def igd_merge(
     ):
         written = 0
         while written < byte_size:
-            data = in_stream.read(max_chunk)
+            to_read = min(max_chunk, byte_size - written)
+            data = in_stream.read(to_read)
             out_stream.write(data)
             written += len(data)
+        assert written == byte_size
 
     with open(out_file, "wb") as fout:
         writer = IGDWriter(fout, num_indiv, ploidy, phased, source, description)

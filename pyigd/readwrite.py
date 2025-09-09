@@ -205,7 +205,7 @@ class IGDReader:
         data this is just num_individuals. Every returned sample index (from get_samples())
         will be less than num_samples.
         """
-        return self._num_idv * self._ploidy if self.is_phased else self._num_idv
+        return (self._num_idv * self._ploidy) if self.is_phased else self._num_idv
 
     @property
     def source(self):
