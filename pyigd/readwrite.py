@@ -417,7 +417,7 @@ class IGDReader:
         mid = high
         while low <= high:
             mid = low + ((high - low) // 2)
-            mid_pos, _ = self.get_position_and_flags(mid)
+            mid_pos, _, _ = self.get_position_flags_copies(mid)
             if mid_pos < position:
                 low = mid + 1
             elif mid_pos > position:
@@ -447,6 +447,10 @@ class IGDFile(IGDReader, AbstractContextManager):
         if self.file_obj is not None:
             self.file_obj.close()
         self.file_obj = None
+
+
+# Bytes
+HEADER_SIZE = 128
 
 
 # Internal class for managing the fixed-sized header of an IGD file.
@@ -561,7 +565,9 @@ class IGDWriter:
         position if not the start of the buffer.
         """
         assert self.out.tell() == 0, "Writing header to wrong location"
-        self.out.write(self.header.pack())
+        packed_header = self.header.pack()
+        assert len(packed_header) == HEADER_SIZE
+        self.out.write(packed_header)
         _write_string(self.out, self.source)
         _write_string(self.out, self.description)
 
@@ -617,6 +623,9 @@ class IGDWriter:
         self.alt_alleles.append(alt_allele)
         is_sparse = len(samples) <= self.should_be_sparse
         filepos = self.out.tell()
+        assert (
+            filepos >= HEADER_SIZE
+        ), f"ERROR: Did you forget to write the header before writing variants?"
         self.index.append(
             self._make_index_entry(position, is_missing, is_sparse, num_copies, filepos)
         )

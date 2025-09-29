@@ -148,6 +148,7 @@ class WriterTests(unittest.TestCase):
             fn = os.path.join(tmpdir, "tmp.igd")
             with open(fn, "wb") as f:
                 w = IGDWriter(f, 200)
+                w.write_header()
                 w.write_variant(100, "A", "G", [1])
                 with self.assertRaises(AssertionError) as context:
                     w.write_variant(99, "A", "G", [1])
