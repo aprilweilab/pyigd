@@ -2,16 +2,18 @@
 
 # pyigd
 
-PyIGD is a Python-only parser the [Indexable Genotype Data (IGD) format](https://github.com/aprilweilab/picovcf/blob/main/IGD.FORMAT.md). We have a short
-[preprint paper](https://www.biorxiv.org/content/10.1101/2025.02.05.636549v1.abstract) that describes the format and some of its advantages.
+PyIGD is a Python-only parser the [Indexable Genotype Data (IGD) format](https://github.com/aprilweilab/picovcf/blob/main/IGD.FORMAT.md). See our short
+[paper](https://academic.oup.com/bioinformaticsadvances/article/5/1/vbaf205/8241955) (or the [preprint](https://www.biorxiv.org/content/10.1101/2025.02.05.636549v1.abstract)) that describes the format and some of its advantages.
 
-For a C++ library that supports creating and parsing IGD, see [picovcf](https://github.com/aprilweilab/picovcf) (which also supports VCF -> IGD conversion).
+For tools to manipulate IGD files (and convert VCF to IGD), use `igdtools` (`pip install igdtools`).
+
+For a C++ library that supports creating and parsing IGD, see [picovcf](https://github.com/aprilweilab/picovcf) (which supports VCF to IGD conversion).
 
 ## Installation
 
 You can install the latest release of PyIGD from pypi, via `pip install pyigd`.
 
-For development, you can clone the code install it directly from the directory (this will automatically reflect any code changes you make):
+For development, you can clone the code and install it directly from the directory (this will automatically reflect any code changes you make):
 ```
 pip install -e pyigd/
 ```
@@ -39,9 +41,8 @@ IGD can be highly performant for a few reasons:
 
 ## How do I use IGD in my project?
 
-* Clone [picovcf](https://github.com/aprilweilab/picovcf) and follow the instructions in its [README](https://github.com/aprilweilab/picovcf/blob/main/README.md) to build the tools for that library.
-  * If you want to be able to convert `.vcf.gz` (compressed VCF) to IGD, make sure you build with `-DENABLE_VCF_GZ=ON`
-* One of the built tools will be `igdtools`, which can converts from VCF to IGD, among other things (such as filtering IGD files).
+* Install [igdtools](https://picovcf.readthedocs.io/en/latest/igdtools.html). The easiest way is via `pip install igdtools`.
+    * `igdtools` can convert from VCF to IGD, among other things (such as filtering IGD files).
 * Do one of the following:
   * If your project is C++, copy [picovcf.hpp](https://github.com/aprilweilab/picovcf/blob/main/picovcf.hpp) into your project, `#include` it somewhere and then use according to the [documentation](https://picovcf.readthedocs.io/en/latest/)
-  * If your project is Python, clone [pyigd](https://github.com/aprilweilab/pyigd/) and install it per the [README instructions](https://github.com/aprilweilab/pyigd/blob/main/README.md).
+  * If your project is Python, install [pyigd](https://github.com/aprilweilab/pyigd/) per the [README instructions](https://github.com/aprilweilab/pyigd/blob/main/README.md) (or just `pip install pyigd`).
