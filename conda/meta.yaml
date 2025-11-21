@@ -1,5 +1,5 @@
 {% set name = "pyigd" %}
-{% set version = "1.3" %}
+{% set version = "1.4" %}
 
 package:
   name: "{{ name|lower }}"
@@ -7,7 +7,7 @@ package:
 
 source:
   url: "https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz"
-  sha256: 82c317b7e193b186ae640bd8f1645724a219f9abbd2ac318d38e34872ccaf14d
+  sha256: 3c7c1a13af13e16d4b4b6a8930a22cf032e3751ce98d18d2126e93eb2b3f60e4
 
 build:
   number: 0
