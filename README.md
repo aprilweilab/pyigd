@@ -2,10 +2,12 @@
 
 # pyigd
 
-PyIGD is a Python-only parser the [Indexable Genotype Data (IGD) format](https://github.com/aprilweilab/picovcf/blob/main/IGD.FORMAT.md). We have a short
-[preprint paper](https://www.biorxiv.org/content/10.1101/2025.02.05.636549v1.abstract) that describes the format and some of its advantages.
+PyIGD is a Python-only parser the [Indexable Genotype Data (IGD) format](https://github.com/aprilweilab/picovcf/blob/main/IGD.FORMAT.md). See our short
+[paper](https://academic.oup.com/bioinformaticsadvances/article/5/1/vbaf205/8241955) (or the [preprint](https://www.biorxiv.org/content/10.1101/2025.02.05.636549v1.abstract)) that describes the format and some of its advantages.
 
-For a C++ library that supports creating and parsing IGD, see [picovcf](https://github.com/aprilweilab/picovcf) (which also supports VCF -> IGD conversion).
+For tools to manipulate IGD files (and convert VCF to IGD), use `igdtools` (`pip install igdtools`).
+
+For a C++ library that supports creating and parsing IGD, see [picovcf](https://github.com/aprilweilab/picovcf) (which supports VCF to IGD conversion).
 
 ## Installation
 
@@ -44,4 +46,4 @@ IGD can be highly performant for a few reasons:
 * One of the built tools will be `igdtools`, which can converts from VCF to IGD, among other things (such as filtering IGD files).
 * Do one of the following:
   * If your project is C++, copy [picovcf.hpp](https://github.com/aprilweilab/picovcf/blob/main/picovcf.hpp) into your project, `#include` it somewhere and then use according to the [documentation](https://picovcf.readthedocs.io/en/latest/)
-  * If your project is Python, clone [pyigd](https://github.com/aprilweilab/pyigd/) and install it per the [README instructions](https://github.com/aprilweilab/pyigd/blob/main/README.md).
+  * If your project is Python, install [pyigd](https://github.com/aprilweilab/pyigd/) per the [README instructions](https://github.com/aprilweilab/pyigd/blob/main/README.md) (or just `pip install pyigd`).
